@@ -1,0 +1,318 @@
+/* ─────────────────────────────────────────────────────────────
+   CemeteryBase — Admin Dashboard Styles
+   Premium dark luxury theme matching user panel
+   Extends style.css components for consistency
+   ───────────────────────────────────────────────────────────── */
+
+/* ─── Inherit & Extend style.css vars ─── */
+:root {
+  /* Task-specific (aligns with style.css) */
+  --bg-main: #0e0e0f;
+  --bg-card: #171718;
+  --bg-sidebar: #111112;
+  --gold: #c9a84c;
+  --text-main: #f5f5f5;
+  --text-muted: #9a9a9a;
+  --border: rgba(255,255,255,0.05);
+  
+  /* From style.css for consistency */
+  --bg-raised: #1c1c1c;
+  --bg-hover: #222222;
+  --gold-light: #e2c97e;
+  --text-mid: #a09a8e;
+  --text-dim: #5a5550;
+  --shadow: 0 8px 32px rgba(0,0,0,0.5);
+  --shadow-sm: 0 4px 16px rgba(0,0,0,0.3);
+  --radius: 12px;
+  --radius-lg: 16px;
+  --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── Admin Page Base ─── */
+.admin-page {
+  background: var(--bg-main);
+  font-family: 'DM Sans', var(--font-body);
+  overflow: hidden;
+}
+
+/* ─── SIDEBAR (Priority) ─── */
+.sidebar {
+  position: fixed;
+  left: 0; top: 0; width: 260px;
+  height: 100vh; background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  padding: 28px 20px;
+  display: flex; flex-direction: column;
+  z-index: 100;
+  transition: var(--transition);
+}
+
+.sidebar-logo {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 40px; padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.logo-icon { 
+  font-size: 28px; color: var(--gold); 
+}
+
+.logo-text {
+  font-family: 'Playfair Display', var(--font-display);
+  font-size: 20px; font-weight: 600; line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.logo-sub {
+  font-size: 11px; color: var(--text-dim);
+  letter-spacing: 0.08em; text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.sidebar-nav {
+  flex: 1; display: flex; flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-link {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px; color: var(--text-muted);
+  text-decoration: none; border-radius: var(--radius);
+  font-weight: 500; font-size: 14px;
+  transition: var(--transition);
+  position: relative; overflow: hidden;
+}
+
+.sidebar-link::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 4px; background: var(--gold); transform: scaleY(0);
+  transition: var(--transition); border-radius: 0 2px 2px 0;
+}
+
+.sidebar-link:hover {
+  background: rgba(201,168,76,0.08); color: var(--gold);
+  transform: translateX(4px);
+}
+
+.sidebar-link.active {
+  background: rgba(201,168,76,0.15); color: var(--gold);
+}
+
+.sidebar-link.active::before { transform: scaleY(1); }
+
+.sidebar-footer { 
+  margin-top: auto; padding-top: 20px; 
+  border-top: 1px solid var(--border); 
+}
+
+.logout { color: var(--text-muted) !important; }
+.logout:hover { color: #e74c3c !important; }
+
+/* ─── MAIN LAYOUT ─── */
+.admin-main {
+  margin-left: 260px; min-height: 100vh;
+  padding: 32px; transition: var(--transition);
+}
+
+/* ─── TABS ─── */
+.tab-content {
+  display: none; opacity: 0; transform: translateY(10px);
+  animation: fadeInUp 0.3s ease forwards;
+}
+
+.tab-content.active { display: block; }
+
+@keyframes fadeInUp {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── PAGE HEADER ─── */
+.page-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 32px; padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.page-title {
+  font-family: 'Playfair Display', var(--font-display);
+  font-size: 32px; font-weight: 600; margin: 0;
+  letter-spacing: -0.02em;
+}
+
+/* ─── STATS CARDS (Priority) ─── */
+.stats-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 24px; margin-bottom: 40px;
+}
+
+.stat-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 32px 24px;
+  text-align: center; transition: var(--transition);
+  box-shadow: var(--shadow-sm);
+}
+
+.stat-card:hover {
+  transform: translateY(-4px); box-shadow: var(--shadow);
+}
+
+.stat-label {
+  font-size: 13px; color: var(--text-mid);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-size: 40px; font-weight: 700; color: var(--gold);
+  font-family: 'Playfair Display', serif; line-height: 1;
+  margin-bottom: 4px;
+}
+
+/* ─── GRID PANELS ─── */
+.admin-grid-2 {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 32px; margin-bottom: 40px;
+}
+
+.admin-panel {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 32px;
+  box-shadow: var(--shadow-sm);
+}
+
+.panel-title {
+  font-family: 'Playfair Display', serif; font-size: 22px;
+  margin-bottom: 16px; color: var(--text-main);
+}
+
+.panel-desc { 
+  color: var(--text-mid); margin-bottom: 24px; 
+  line-height: 1.6;
+}
+
+/* ─── FILTERS (Reuse style.css) ─── */
+.admin-filters {
+  display: flex; flex-wrap: wrap; gap: 16px;
+  align-items: end; margin-bottom: 32px;
+  padding: 24px; background: var(--bg-raised);
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+}
+
+/* ─── COLLECT FORM ─── */
+.collect-form { display: flex; flex-direction: column; gap: 24px; }
+
+.field-group { display: flex; flex-direction: column; gap: 8px; }
+
+.field-label {
+  font-size: 12px; font-weight: 600;
+  color: var(--text-mid); letter-spacing: 0.05em;
+}
+
+/* Toggle Switch */
+.toggle-label {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 14px; cursor: pointer;
+}
+
+.toggle-input { display: none; }
+
+.toggle-track {
+  width: 44px; height: 24px; background: var(--border);
+  border-radius: 12px; position: relative; transition: var(--transition);
+}
+
+.toggle-input:checked + .toggle-track {
+  background: var(--gold);
+}
+
+.toggle-track::after {
+  content: ''; position: absolute;
+  width: 20px; height: 20px; background: white;
+  border-radius: 50%; top: 2px; left: 2px;
+  transition: var(--transition);
+}
+
+.toggle-input:checked + .toggle-track::after {
+  transform: translateX(20px);
+}
+
+/* ─── TABLE (Priority, Extend style.css) ─── */
+.table-wrap {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.data-table thead th {
+  color: var(--gold) !important; font-weight: 600;
+}
+
+.data-table tbody tr:hover {
+  background: rgba(201,168,76,0.05) !important;
+}
+
+/* ─── PIPELINE ─── */
+.pipeline-steps {
+  display: flex; align-items: flex-start; gap: 40px;
+  position: relative; overflow: hidden;
+}
+
+.pipeline-step {
+  flex: 1; display: flex; gap: 16px; padding: 24px;
+  background: var(--bg-raised); border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.step-num {
+  width: 36px; height: 36px; background: var(--gold);
+  color: #0e0e0f; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; font-weight: 700;
+  font-size: 16px; flex-shrink: 0;
+}
+
+.pipeline-arrow {
+  font-size: 24px; color: var(--text-dim);
+  align-self: center; font-weight: 300;
+  margin: 0 20px;
+}
+
+/* ─── EXTEND MODAL (Reuse style.css) ─── */
+.modal-card { box-shadow: var(--shadow) !important; }
+.modal-wide { max-width: 900px; }
+.modal-actions { gap: 12px; }
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 1024px) {
+  .admin-grid-2 { grid-template-columns: 1fr; }
+  .pipeline-steps { flex-direction: column; }
+  .pipeline-arrow { display: none; }
+}
+
+@media (max-width: 768px) {
+  .sidebar { transform: translateX(-100%); }
+  .admin-main { margin-left: 0; }
+  
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .admin-filters { flex-direction: column; align-items: stretch; }
+  
+  .page-header { flex-direction: column; align-items: stretch; gap: 16px; }
+}
+
+@media (max-width: 480px) {
+  .stats-grid { grid-template-columns: 1fr; }
+  .admin-main { padding: 20px 16px; }
+}
+
+/* ─── SCROLLBAR (Gold accent) ─── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-raised); }
+::-webkit-scrollbar-thumb {
+  background: var(--gold); border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--gold-light); }
+
+/* ─── Print & Focus States ─── */
+@media print { .sidebar { display: none; } .admin-main { margin-left: 0; } }
+input:focus, select:focus, button:focus {
+  outline: 2px solid var(--gold); outline-offset: 2px;
+}

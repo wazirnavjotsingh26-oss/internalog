@@ -1,0 +1,85 @@
+# =====================
+# Python / Backend
+# =====================
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.so
+
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+
+# =====================
+# Environment Variables (SENSITIVE - Never commit!)
+# =====================
+.env
+.env.local
+.env.*.local
+backend/.env
+
+# =====================
+# Node / Frontend
+# =====================
+node_modules/
+frontend/node_modules/
+
+# Vite build output
+frontend/dist/
+dist/
+
+# npm / yarn
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# =====================
+# IDEs & Editors
+# =====================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.sublime-project
+*.sublime-workspace
+
+# =====================
+# OS Files
+# =====================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =====================
+# Logs
+# =====================
+*.log
+logs/
+
+# =====================
+# Docker
+# =====================
+.dockerignore
+
+# =====================
+# Misc
+# =====================
+*.bak
+*.tmp
+*.swp
