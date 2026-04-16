@@ -10,8 +10,13 @@ load_dotenv()
 
 from flask import Flask, send_from_directory
 from flask_cors import CORS
-from db import init_db
-from routes import register_routes
+try:
+    from backend.db import init_db
+    from backend.routes import register_routes
+except ImportError:  # pragma: no cover
+    # Allow running as a script: `python backend/app.py`
+    from db import init_db
+    from routes import register_routes
 
 
 def create_app():

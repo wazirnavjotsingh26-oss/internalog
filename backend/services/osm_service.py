@@ -1,6 +1,9 @@
 import requests
 import time
-from services.geocode_service import reverse_geocode
+try:
+    from backend.services.geocode_service import reverse_geocode
+except ImportError:  # pragma: no cover
+    from services.geocode_service import reverse_geocode
 
 # Multiple Overpass API endpoints (fallback system)
 OVERPASS_URLS = [

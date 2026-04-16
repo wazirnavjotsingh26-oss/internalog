@@ -8,7 +8,7 @@ import { Bar, Doughnut, Line } from 'react-chartjs-2'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, PointElement, LineElement, Filler, Tooltip, Legend)
 
-const API = ''
+const API = import.meta.env.VITE_API_BASE || ''
 
 function esc(str) {
   if (!str) return ''

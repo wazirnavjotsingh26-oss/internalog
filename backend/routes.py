@@ -13,9 +13,15 @@ import time
 from bson import ObjectId
 from flask import Response, g, jsonify, request, session
 
-from db import get_collection
-from services.google_service import enrich_with_google
-from services.osm_service import fetch_cemeteries_by_state
+try:
+    from backend.db import get_collection
+    from backend.services.google_service import enrich_with_google
+    from backend.services.osm_service import fetch_cemeteries_by_state
+except ImportError:  # pragma: no cover
+    # Allow running as a script: `python backend/app.py`
+    from db import get_collection
+    from services.google_service import enrich_with_google
+    from services.osm_service import fetch_cemeteries_by_state
 
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
