@@ -24,17 +24,10 @@ function joinUrl(base, path) {
   return `${base}${path}`
 }
 
-function shouldBypassProxy(path) {
-  // Long-running collection calls can hit Vercel/proxy timeouts; send directly to Render.
-  return path === '/api/collect' || path.startsWith('/api/collect?') || path.startsWith('/api/collect/')
-}
-
 export async function apiFetch(path, options = {}) {
-  const shouldUseDirectRender =
-    shouldBypassProxy(path) && !runningLocal && (runningOnVercel || API_BASE !== '')
-  const directRenderBase = normalizedEnvBase || FALLBACK_API_BASE
-  const baseForRequest = shouldUseDirectRender ? directRenderBase : API_BASE
-  const url = joinUrl(baseForRequest, path)
+  // Always use API_BASE (same-origin on Vercel via vercel.json rewrites). Avoids CORS failures
+  // from calling Render directly. Collection uses short 202 + polling, so proxy timeouts are fine.
+  const url = joinUrl(API_BASE, path)
   const headers = new Headers(options.headers || {})
   const token = typeof window !== 'undefined' ? window.localStorage.getItem(ADMIN_TOKEN_KEY) : ''
   if (token && !headers.has('Authorization')) {
@@ -46,9 +39,7 @@ export async function apiFetch(path, options = {}) {
     headers,
   }
   if (!requestOptions.credentials) {
-    // Direct cross-origin collection requests should not include cookies.
-    // Auth still works via Bearer token header and avoids strict CORS credential requirements.
-    requestOptions.credentials = shouldUseDirectRender ? 'omit' : 'include'
+    requestOptions.credentials = 'include'
   }
 
   return fetch(url, requestOptions)

@@ -67,6 +67,12 @@ def create_app():
     allow_all_origins = not app.config["IS_PRODUCTION"] and not allowed_origins
     cors_origins = "*" if allow_all_origins else allowed_origins
 
+    if app.config["IS_PRODUCTION"] and not allowed_origins:
+        app.logger.warning(
+            "FRONTEND_ORIGIN or CORS_ALLOWED_ORIGINS is unset. "
+            "Browsers calling this API from another domain (e.g. direct Render URL) will fail CORS."
+        )
+
     CORS(
         app,
         # Production uses explicit allowlist; local dev stays permissive.
