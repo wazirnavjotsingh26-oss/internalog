@@ -1,0 +1,20 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://intern-alog-012-2.onrender.com/api/$1"
+    },
+    {
+      "source": "/admin/login",
+      "destination": "https://intern-alog-012-2.onrender.com/admin/login"
+    },
+    {
+      "source": "/admin/logout",
+      "destination": "https://intern-alog-012-2.onrender.com/admin/logout"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

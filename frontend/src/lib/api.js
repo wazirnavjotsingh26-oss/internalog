@@ -3,12 +3,12 @@ const envBase = (import.meta.env.VITE_API_BASE || '').trim()
 const normalizedEnvBase = envBase.replace(/\/+$/, '')
 
 function resolveApiBase() {
-  // When hosted on Vercel, force backend to Render unless a valid explicit API base is provided.
+  // On Vercel, prefer same-origin + vercel.json rewrites to avoid browser CORS issues.
   const host = (typeof window !== 'undefined' && window.location?.hostname) || ''
   const runningOnVercel = host.endsWith('.vercel.app')
 
   if (normalizedEnvBase && normalizedEnvBase !== '/') return normalizedEnvBase
-  if (runningOnVercel) return FALLBACK_API_BASE
+  if (runningOnVercel) return ''
   return FALLBACK_API_BASE
 }
 
