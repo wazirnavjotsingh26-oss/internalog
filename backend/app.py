@@ -17,6 +17,8 @@ if os.path.exists(_backend_env):
 
 from flask import Flask, send_from_directory, request
 from flask_cors import CORS
+app = Flask(__name__)
+CORS(app)
 try:
     from backend.db import init_db
     from backend.routes import register_routes

@@ -3,7 +3,7 @@
  * Handles state/city dropdowns, search, results table, pagination, and CSV export.
  */
 
-const API_BASE = '';   // Relative to same origin (Flask backend serves both)
+const API_BASE = 'https://intern-alog-012-2.onrender.com/';   // Relative to same origin (Flask backend serves both)
 const PAGE_SIZE = 50;
 
 let currentPage = 0;
