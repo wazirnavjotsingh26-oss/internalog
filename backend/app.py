@@ -43,15 +43,11 @@ def create_app():
     app.config.setdefault("SESSION_COOKIE_SAMESITE", os.environ.get("SESSION_COOKIE_SAMESITE", "Lax"))
     app.config.setdefault("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "").lower() == "true")
 
-    allowed_origins = [
-        origin.strip()
-        for origin in os.environ.get("FRONTEND_ORIGINS", "").split(",")
-        if origin.strip()
-    ]
-    if allowed_origins:
-        CORS(app, supports_credentials=True, origins=allowed_origins)
-    else:
-        CORS(app, supports_credentials=True)
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": "*"
+        }
+    })
 
     try:
         init_db(app)
@@ -75,8 +71,6 @@ def create_app():
         pass
 
     # Catch-all: serve React index.html for any non-API route
-    @app.route('/', defaults={'path': ''})
-    @app.route('/<path:path>')
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
     def serve_react(path):
