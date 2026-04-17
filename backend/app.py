@@ -43,10 +43,9 @@ def create_app():
     debug_mode = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     default_samesite = "Lax" if debug_mode else "None"
     default_secure = False if debug_mode else True
-    app.config.setdefault("SESSION_COOKIE_SAMESITE", os.environ.get("SESSION_COOKIE_SAMESITE", default_samesite))
-    app.config.setdefault(
-        "SESSION_COOKIE_SECURE",
-        os.environ.get("SESSION_COOKIE_SECURE", str(default_secure)).lower() == "true",
+    app.config["SESSION_COOKIE_SAMESITE"] = os.environ.get("SESSION_COOKIE_SAMESITE", default_samesite)
+    app.config["SESSION_COOKIE_SECURE"] = (
+        os.environ.get("SESSION_COOKIE_SECURE", str(default_secure)).lower() == "true"
     )
 
     configured_origins = [origin.strip() for origin in os.environ.get("FRONTEND_ORIGIN", "").split(",") if origin.strip()]
