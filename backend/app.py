@@ -77,12 +77,20 @@ def create_app():
     # Catch-all: serve React index.html for any non-API route
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
+    @app.route('/', defaults={'path': ''})
+    @app.route('/<path:path>')
     def serve_react(path):
-        # Check if the file exists in dist (JS, CSS, assets)
+
+    # 🔥 VERY IMPORTANT: skip API routes
+        if path.startswith("api"):
+            return {"error": "API route not found"}, 404
+
+    # serve static files if exist
         full = os.path.join(dist_path, path)
         if path and os.path.exists(full):
             return send_from_directory(dist_path, path)
-        # Otherwise serve index.html (React Router handles it)
+
+    # otherwise serve React app
         return send_from_directory(dist_path, 'index.html')
 
     return app
