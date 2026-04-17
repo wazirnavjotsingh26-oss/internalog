@@ -1,8 +1,9 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "https://intern-alog-012-2.onrender.com/api/$1"
+      "source": "/api/:path*",
+      "destination": "https://intern-alog-012-2.onrender.com/api/:path*"
     },
     {
       "source": "/admin/login",
@@ -17,5 +18,4 @@
       "destination": "/index.html"
     }
   ]
-
-
+}
