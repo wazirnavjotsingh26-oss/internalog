@@ -46,7 +46,9 @@ export async function apiFetch(path, options = {}) {
     headers,
   }
   if (!requestOptions.credentials) {
-    requestOptions.credentials = 'include'
+    // Direct cross-origin collection requests should not include cookies.
+    // Auth still works via Bearer token header and avoids strict CORS credential requirements.
+    requestOptions.credentials = shouldUseDirectRender ? 'omit' : 'include'
   }
 
   return fetch(url, requestOptions)
