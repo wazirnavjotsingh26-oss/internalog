@@ -1,4 +1,5 @@
-const rawBase = import.meta.env.VITE_API_BASE || ''
+const FALLBACK_API_BASE = 'https://intern-alog-012-2.onrender.com'
+const rawBase = import.meta.env.VITE_API_BASE || FALLBACK_API_BASE
 
 export const API_BASE = rawBase.replace(/\/+$/, '')
 

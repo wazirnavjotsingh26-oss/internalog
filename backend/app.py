@@ -43,11 +43,23 @@ def create_app():
     app.config.setdefault("SESSION_COOKIE_SAMESITE", os.environ.get("SESSION_COOKIE_SAMESITE", "Lax"))
     app.config.setdefault("SESSION_COOKIE_SECURE", os.environ.get("SESSION_COOKIE_SECURE", "").lower() == "true")
 
-    CORS(app, resources={
-        r"/api/*": {
-            "origins": "*"
-        }
-    })
+    configured_origins = [origin.strip() for origin in os.environ.get("FRONTEND_ORIGIN", "").split(",") if origin.strip()]
+    if not configured_origins:
+        # Safe defaults: local dev + any Vercel deployment domain.
+        configured_origins = [
+            "http://localhost:5173",
+            "http://localhost:3000",
+            r"https://.*\.vercel\.app",
+        ]
+
+    CORS(
+        app,
+        supports_credentials=True,
+        resources={
+            r"/api/*": {"origins": configured_origins},
+            r"/admin/*": {"origins": configured_origins},
+        },
+    )
 
     try:
         init_db(app)

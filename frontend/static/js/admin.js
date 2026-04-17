@@ -187,9 +187,10 @@ async function triggerCollection() {
   log.scrollTop = log.scrollHeight;
 
   try {
-    const res = await fetch('/api/collect', {
+    const res = await fetch(`${API_BASE}/api/collect`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
+      credentials: 'include',
       body: JSON.stringify({state, enrich})
     });
     const data = await res.json();
@@ -217,7 +218,9 @@ async function loadCollectStates() {
 
 async function editCemetery(id) {
   try {
-    const res = await fetch(`/api/cemeteries/${id}`);
+    const res = await fetch(`${API_BASE}/api/cemeteries/${id}`, {
+      credentials: 'include'
+    });
     const cemetery = await res.json();
     showEditModal(cemetery);
   } catch (e) {
@@ -228,7 +231,10 @@ async function editCemetery(id) {
 async function deleteCemetery(id, name) {
   if (!confirm(`Delete "${name}"?`)) return;
   try {
-    await fetch(`/api/cemeteries/${id}`, {method: 'DELETE'});
+    await fetch(`${API_BASE}/api/cemeteries/${id}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    });
     loadAdminCemeteries();
   } catch (e) {
     alert('Delete failed');
@@ -260,9 +266,10 @@ async function saveEdit() {
   };
   
   try {
-    await fetch(`/api/cemeteries/${id}`, {
+    await fetch(`${API_BASE}/api/cemeteries/${id}`, {
       method: 'PUT',
       headers: {'Content-Type': 'application/json'},
+      credentials: 'include',
       body: JSON.stringify(updates)
     });
     closeEditModal();
@@ -286,7 +293,7 @@ function esc(str) {
 async function exportAdminCSV() {
   const params = new URLSearchParams();
   params.set('limit', 10000); // Large export
-  window.open(`/api/cemeteries?${params.toString()}&export=csv`);
+  window.open(`${API_BASE}/api/cemeteries?${params.toString()}&export=csv`);
 }
 
 function debounce(fn, delay) {
