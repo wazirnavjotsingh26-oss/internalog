@@ -10,14 +10,29 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, PointElemen
 
 import { apiFetch } from '../lib/api'
 
-function esc(str) {
-  if (!str) return ''
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+function formatRelativeTime(timestamp) {
+  if (!timestamp) return 'No updates yet'
+  const when = new Date(timestamp)
+  if (Number.isNaN(when.getTime())) return 'No updates yet'
+
+  const seconds = Math.max(0, Math.floor((Date.now() - when.getTime()) / 1000))
+  if (seconds < 60) return 'Just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} hr${hours === 1 ? '' : 's'} ago`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `${days} day${days === 1 ? '' : 's'} ago`
+  const months = Math.floor(days / 30)
+  if (months < 12) return `${months} month${months === 1 ? '' : 's'} ago`
+  const years = Math.floor(months / 12)
+  return `${years} year${years === 1 ? '' : 's'} ago`
 }
 
 // ─── NAVBAR ──────────────────────────────────────────────────────────────────
-function Navbar({ activeTab, setActiveTab }) {
+function Navbar({ activeTab, setActiveTab, onLogoClick, onSearchClick }) {
   const navigate = useNavigate()
+  const logoIsActive = activeTab === 'directory'
   const tabs = [
     { id: 'directory', label: 'Directory', badge: null },
     { id: 'insights', label: 'Insights', badge: 'NEW' },
@@ -25,20 +40,29 @@ function Navbar({ activeTab, setActiveTab }) {
   ]
   return (
     <header className="sticky top-0 z-50 bg-[#0a0a0a]/95 backdrop-blur border-b border-[#1e1e1e]">
-      <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 h-14 flex items-center justify-between gap-2">
         {/* Logo */}
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-gold flex items-center justify-center text-[#0a0a0a] text-xs font-bold font-display">CB</div>
-          <span className="text-xs font-semibold tracking-[0.18em] uppercase text-[#e8e4dc]">CemeteryBase</span>
-        </div>
+        <button
+          type="button"
+          onClick={onLogoClick}
+          className={`group flex items-center gap-3 rounded-md px-1 py-1 transition-all outline-none focus-visible:ring-2 focus-visible:ring-gold/60 ${
+            logoIsActive ? 'shadow-[0_0_0_1px_rgba(201,168,76,0.25)]' : ''
+          }`}
+          aria-label="Go to Directory"
+        >
+          <div className="w-8 h-8 rounded-full bg-gold flex items-center justify-center text-[#0a0a0a] text-xs font-bold font-display ring-1 ring-gold/40 group-hover:ring-gold transition-all group-hover:shadow-[0_0_14px_rgba(201,168,76,0.35)]">CB</div>
+          <span className={`hidden sm:inline text-xs font-semibold tracking-[0.18em] uppercase transition-colors ${
+            logoIsActive ? 'text-gold' : 'text-[#e8e4dc] group-hover:text-gold'
+          }`}>CemeteryBase</span>
+        </button>
 
         {/* Center Tabs */}
-        <nav className="flex items-center gap-1">
+        <nav className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto">
           {tabs.map(t => (
             <button
               key={t.id}
               onClick={() => setActiveTab(t.id)}
-              className={`relative px-4 py-1.5 text-sm font-medium rounded-sm transition-colors flex items-center gap-1.5 ${
+              className={`relative px-2 sm:px-4 py-1.5 text-xs sm:text-sm font-medium rounded-sm transition-colors flex items-center gap-1 ${
                 activeTab === t.id
                   ? 'text-[#e8e4dc] border-b-2 border-gold'
                   : 'text-[#5a5550] hover:text-[#a09a8e]'
@@ -54,7 +78,7 @@ function Navbar({ activeTab, setActiveTab }) {
           ))}
           <button
             onClick={() => navigate('/admin')}
-            className="px-4 py-1.5 text-sm font-medium text-[#5a5550] hover:text-[#a09a8e] transition-colors"
+            className="px-2 sm:px-4 py-1.5 text-xs sm:text-sm font-medium text-[#5a5550] hover:text-[#a09a8e] transition-colors"
           >
             Admin
           </button>
@@ -62,14 +86,14 @@ function Navbar({ activeTab, setActiveTab }) {
 
         {/* Right icons */}
         <div className="flex items-center gap-3">
-          <button className="text-[#5a5550] hover:text-[#a09a8e] transition-colors">
+          <button
+            type="button"
+            onClick={onSearchClick}
+            className="text-[#5a5550] hover:text-[#a09a8e] transition-colors"
+            aria-label="Open search"
+          >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </button>
-          <button className="text-[#5a5550] hover:text-[#a09a8e] transition-colors">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
           </button>
         </div>
@@ -152,7 +176,7 @@ function DirectoryTab({ setActiveTab }) {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6">
       {/* Hero */}
       <section className="pt-14 pb-10 text-center">
         <div className="inline-flex items-center gap-2 bg-[#161616] border border-[#2a2a2a] rounded-full px-4 py-1.5 mb-8">
@@ -167,16 +191,16 @@ function DirectoryTab({ setActiveTab }) {
         <p className="text-[#a09a8e] text-base max-w-xl mx-auto mb-8 leading-relaxed">
           Verified, structured, nationwide cemetery data — powering research,<br />genealogy, and enterprise operations.
         </p>
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <button
             onClick={() => document.getElementById('search-section').scrollIntoView({ behavior: 'smooth' })}
-            className="flex items-center gap-2 px-6 py-2.5 border border-gold/40 text-gold text-sm font-medium rounded hover:bg-gold/5 transition-colors"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 border border-gold/40 text-gold text-sm font-medium rounded hover:bg-gold/5 transition-colors"
           >
             Explore Database <span>→</span>
           </button>
           <button
             onClick={() => setActiveTab('insights')}
-            className="flex items-center gap-2 px-6 py-2.5 border border-[#2a2a2a] text-[#a09a8e] text-sm font-medium rounded hover:border-[#3a3a3a] transition-colors"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 border border-[#2a2a2a] text-[#a09a8e] text-sm font-medium rounded hover:border-[#3a3a3a] transition-colors"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
             View Insights
@@ -190,7 +214,7 @@ function DirectoryTab({ setActiveTab }) {
           { icon: '🏛', value: (stats?.total ?? 0).toLocaleString(), label: 'Cemeteries' },
           { icon: '🌐', value: '50', label: 'States Covered' },
           { icon: '📞', value: (stats?.with_phone ?? 0).toLocaleString(), label: 'Verified Contacts', color: 'text-pink-400' },
-          { icon: '🕒', value: '2 hrs ago', label: 'Last Updated', color: 'text-sky-400' },
+          { icon: '🕒', value: formatRelativeTime(stats?.last_entry_at), label: 'Last Updated', color: 'text-sky-400' },
         ].map((s, i) => (
           <div key={i} className="bg-[#111111] border border-[#1e1e1e] rounded-lg p-4 text-center">
             <div className="text-xl mb-1">{s.icon}</div>
@@ -490,7 +514,7 @@ function InsightsTab() {
       </div>
 
       {/* Two charts */}
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
         <div className="bg-[#111111] border border-[#1e1e1e] rounded-xl p-5">
           <h3 className="font-display text-sm font-semibold text-[#a09a8e] uppercase tracking-widest mb-1">Cemeteries by State</h3>
           <p className="text-[#3a3a3a] text-xs mb-4">Top 8 states by total records</p>
@@ -551,9 +575,32 @@ function ApiTab() {
 // ─── MAIN PUBLIC SITE ─────────────────────────────────────────────────────────
 export default function PublicSite() {
   const [activeTab, setActiveTab] = useState('directory')
+
+  function goToDirectory() {
+    setActiveTab('directory')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function goToSearchSection() {
+    setActiveTab('directory')
+    window.requestAnimationFrame(() => {
+      setTimeout(() => {
+        const el = document.getElementById('search-section')
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      }, 0)
+    })
+  }
+
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
-      <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Navbar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onLogoClick={goToDirectory}
+        onSearchClick={goToSearchSection}
+      />
       {activeTab === 'directory' && <DirectoryTab setActiveTab={setActiveTab} />}
       {activeTab === 'insights' && <InsightsTab />}
       {activeTab === 'api' && <ApiTab />}

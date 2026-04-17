@@ -26,6 +26,7 @@ const SCHEDULE_DAYS = [
   { key: 'thu', label: 'Thursday' },
   { key: 'fri', label: 'Friday' },
   { key: 'sat', label: 'Saturday' },
+  { key: 'sun', label: 'Sunday' },
 ]
 
 function createDefaultSchedule() {
@@ -46,12 +47,16 @@ function parseOpeningHoursToSchedule(openingHours) {
     thu: 'thu', thur: 'thu', thurs: 'thu', thursday: 'thu',
     fri: 'fri', friday: 'fri',
     sat: 'sat', saturday: 'sat',
+    sun: 'sun', sunday: 'sun',
   }
 
   const chunks = openingHours.split(';').map(part => part.trim()).filter(Boolean)
   chunks.forEach(chunk => {
-    const [dayRaw, hoursRaw] = chunk.split(':').map(v => (v || '').trim())
-    const dayKey = dayAlias[(dayRaw || '').toLowerCase()]
+    const match = chunk.match(/^([^:]+):\s*(.+)$/)
+    if (!match) return
+    const dayRaw = (match[1] || '').trim()
+    const hoursRaw = (match[2] || '').trim()
+    const dayKey = dayAlias[dayRaw.toLowerCase()]
     if (!dayKey || !hoursRaw) return
     if (hoursRaw.toLowerCase() === 'closed') {
       schedule[dayKey] = { ...schedule[dayKey], closed: true }
@@ -92,7 +97,7 @@ export default function AddCemetery() {
       setLoading(true)
       setError('')
       try {
-        const res = await apiFetch(`/api/cemeteries/${id}`, { credentials: 'include' })
+        const res = await apiFetch(`/api/cemeteries/${id}`)
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Failed to load cemetery')
         if (!ignore) {
@@ -144,7 +149,6 @@ export default function AddCemetery() {
         method: isEdit ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-        credentials: 'include',
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Failed to save.'); setSaving(false); return }
@@ -191,8 +195,8 @@ export default function AddCemetery() {
   return (
     <div className="min-h-screen bg-[#080808]">
       {/* ── Top bar ── */}
-      <div className="sticky top-0 z-10 bg-[#080808]/95 backdrop-blur border-b border-[#161616] px-8 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="sticky top-0 z-10 bg-[#080808]/95 backdrop-blur border-b border-[#161616] px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={() => navigate('/admin/cemeteries')}
             className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#111] border border-[#222] text-[#5a5550] hover:text-[#e8e4dc] hover:border-[#333] transition-all"
@@ -206,7 +210,7 @@ export default function AddCemetery() {
             <h1 className="text-sm font-semibold text-[#e8e4dc] leading-tight">{isEdit ? 'Edit Cemetery Record' : 'Add New Cemetery Record'}</h1>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-end sm:self-auto">
           <button
             type="button"
             onClick={() => navigate('/admin/cemeteries')}
@@ -233,7 +237,7 @@ export default function AddCemetery() {
       </div>
 
       {/* ── Body ── */}
-      <div className="max-w-4xl mx-auto px-8 py-10">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
 
         {/* Success banner */}
         {success && (
@@ -268,7 +272,7 @@ export default function AddCemetery() {
               </p>
               <div className="space-y-4">
                 <Field label="Cemetery Name" name="name" required placeholder="e.g. Oakwood Cemetery" />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="Country" name="country" placeholder="United States" />
                   <Field label="Type" name="type">
                     <select id="f-type" name="type" value={form.type} onChange={set} className={inp}>
@@ -289,7 +293,7 @@ export default function AddCemetery() {
                 Location
               </p>
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="State" name="state" required>
                     <select id="f-state" name="state" value={form.state} onChange={set} className={inp} required>
                       <option value="">— Select state —</option>

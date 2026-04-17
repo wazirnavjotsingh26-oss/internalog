@@ -8,6 +8,7 @@ from functools import wraps
 from io import StringIO
 import csv
 import os
+import re
 import time
 
 from bson import ObjectId
@@ -46,6 +47,12 @@ def register_routes(app):
     app.config.setdefault("API_LOGS", deque(maxlen=API_LOG_LIMIT))
     token_serializer = URLSafeTimedSerializer(app.secret_key, salt="admin-auth")
 
+    if app.config.get("IS_PRODUCTION"):
+        if ADMIN_PASSWORD == "admin123" or len(ADMIN_PASSWORD.strip()) < 12:
+            raise RuntimeError(
+                "Set a strong ADMIN_PASSWORD (min 12 chars, not default) when APP_ENV=production."
+            )
+
     def build_website_fallback(doc):
         name = (doc.get("name") or "Cemetery").strip()
         location_hint = (
@@ -60,6 +67,18 @@ def register_routes(app):
             if part
         )
         return f"https://www.google.com/search?q={query}"
+
+    def to_bounded_int(value, default, minimum=None, maximum=None):
+        """Parse integer safely with optional bounds."""
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            parsed = default
+        if minimum is not None:
+            parsed = max(minimum, parsed)
+        if maximum is not None:
+            parsed = min(maximum, parsed)
+        return parsed
 
     def apply_record_fallbacks(doc):
         clean = dict(doc or {})
@@ -101,7 +120,12 @@ def register_routes(app):
                 "google_places_enabled": bool(data.get("google_places_enabled")),
                 "auto_clean_enabled": bool(data.get("auto_clean_enabled")),
                 "allow_public_exports": bool(data.get("allow_public_exports", True)),
-                "default_collection_limit": max(1, min(int(data.get("default_collection_limit", 200)), 5000)),
+                "default_collection_limit": to_bounded_int(
+                    data.get("default_collection_limit", 200),
+                    default=200,
+                    minimum=1,
+                    maximum=5000,
+                ),
                 "collection_batch_note": str(data.get("collection_batch_note", "")).strip(),
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }
@@ -154,13 +178,18 @@ def register_routes(app):
         county = (args.get("county") or "").strip()
         cemetery_type = (args.get("type") or "").strip()
         search = (args.get("search") or "").strip()
+        country_pattern = re.escape(country)
+        state_pattern = re.escape(state)
+        city_pattern = re.escape(city)
+        county_pattern = re.escape(county)
+        type_pattern = re.escape(cemetery_type)
 
         if country:
             if country.lower() == DEFAULT_COUNTRY.lower():
                 and_filters.append(
                     {
                         "$or": [
-                            {"country": {"$regex": f"^{country}$", "$options": "i"}},
+                            {"country": {"$regex": f"^{country_pattern}$", "$options": "i"}},
                             {"country": {"$exists": False}},
                             {"country": None},
                             {"country": ""},
@@ -168,15 +197,15 @@ def register_routes(app):
                     }
                 )
             else:
-                and_filters.append({"country": {"$regex": f"^{country}$", "$options": "i"}})
+                and_filters.append({"country": {"$regex": f"^{country_pattern}$", "$options": "i"}})
         if state:
-            and_filters.append({"state": {"$regex": f"^{state}$", "$options": "i"}})
+            and_filters.append({"state": {"$regex": f"^{state_pattern}$", "$options": "i"}})
         if city:
-            and_filters.append({"city": {"$regex": f"^{city}$", "$options": "i"}})
+            and_filters.append({"city": {"$regex": f"^{city_pattern}$", "$options": "i"}})
         if county:
-            and_filters.append({"county": {"$regex": f"^{county}$", "$options": "i"}})
+            and_filters.append({"county": {"$regex": f"^{county_pattern}$", "$options": "i"}})
         if cemetery_type:
-            and_filters.append({"type": {"$regex": f"^{cemetery_type}$", "$options": "i"}})
+            and_filters.append({"type": {"$regex": f"^{type_pattern}$", "$options": "i"}})
         if search:
             and_filters.append(
                 {
@@ -258,6 +287,87 @@ def register_routes(app):
         filled = sum(1 for field in fields if doc.get(field))
         return round((filled / len(fields)) * 100)
 
+    def parse_iso_datetime(value):
+        if not value:
+            return None
+        try:
+            text = str(value).strip()
+            if not text:
+                return None
+            if text.endswith("Z"):
+                text = text[:-1] + "+00:00"
+            parsed = datetime.fromisoformat(text)
+            if parsed.tzinfo is None:
+                return parsed.replace(tzinfo=timezone.utc)
+            return parsed.astimezone(timezone.utc)
+        except Exception:
+            return None
+
+    def get_last_entry_metadata(collection):
+        latest_candidates = []
+
+        latest_updated = collection.find_one(
+            {"updated_at": {"$type": "string", "$nin": ["", None]}},
+            {"updated_at": 1, "name": 1, "state": 1},
+            sort=[("updated_at", -1)],
+        )
+        if latest_updated:
+            updated_dt = parse_iso_datetime(latest_updated.get("updated_at"))
+            if updated_dt:
+                latest_candidates.append(
+                    {
+                        "dt": updated_dt,
+                        "source": "updated_at",
+                        "name": latest_updated.get("name"),
+                        "state": latest_updated.get("state"),
+                    }
+                )
+
+        latest_created = collection.find_one(
+            {"created_at": {"$type": "string", "$nin": ["", None]}},
+            {"created_at": 1, "name": 1, "state": 1},
+            sort=[("created_at", -1)],
+        )
+        if latest_created:
+            created_dt = parse_iso_datetime(latest_created.get("created_at"))
+            if created_dt:
+                latest_candidates.append(
+                    {
+                        "dt": created_dt,
+                        "source": "created_at",
+                        "name": latest_created.get("name"),
+                        "state": latest_created.get("state"),
+                    }
+                )
+
+        latest_object_id_doc = collection.find_one({}, {"name": 1, "state": 1}, sort=[("_id", -1)])
+        if latest_object_id_doc and latest_object_id_doc.get("_id"):
+            oid_dt = latest_object_id_doc["_id"].generation_time.astimezone(timezone.utc)
+            latest_candidates.append(
+                {
+                    "dt": oid_dt,
+                    "source": "object_id",
+                    "name": latest_object_id_doc.get("name"),
+                    "state": latest_object_id_doc.get("state"),
+                }
+            )
+
+        if not latest_candidates:
+            return {
+                "last_entry_at": None,
+                "last_entry_source": None,
+                "last_entry_name": None,
+                "last_entry_state": None,
+            }
+
+        latest = max(latest_candidates, key=lambda item: item["dt"])
+        return {
+            "last_entry_at": latest["dt"].isoformat(),
+            "last_entry_source": latest["source"],
+            "last_entry_name": latest.get("name"),
+            "last_entry_state": latest.get("state"),
+        }
+
     def build_stats():
         collection = get_collection()
         total = collection.count_documents({})
@@ -284,6 +394,7 @@ def register_routes(app):
                 ]
             )
         )
+        last_entry = get_last_entry_metadata(collection)
         return {
             "total": total,
             "with_phone": with_phone,
@@ -292,6 +403,10 @@ def register_routes(app):
             "with_address": with_address,
             "top_states": [{"state": s["_id"], "count": s["count"]} for s in top_states],
             "by_source": [{"source": s["_id"], "count": s["count"]} for s in by_source],
+            "last_entry_at": last_entry["last_entry_at"],
+            "last_entry_source": last_entry["last_entry_source"],
+            "last_entry_name": last_entry["last_entry_name"],
+            "last_entry_state": last_entry["last_entry_state"],
         }
 
     @app.before_request
@@ -404,7 +519,12 @@ def register_routes(app):
     @app.route("/api/admin/logs", methods=["GET"])
     @admin_required
     def get_api_logs():
-        limit = min(max(int(request.args.get("limit", 100)), 1), API_LOG_LIMIT)
+        limit = to_bounded_int(
+            request.args.get("limit", 100),
+            default=100,
+            minimum=1,
+            maximum=API_LOG_LIMIT,
+        )
         return jsonify({"logs": list(app.config["API_LOGS"])[:limit]})
 
     @app.route("/api/admin/settings", methods=["GET"])
@@ -590,7 +710,8 @@ def register_routes(app):
         settings = get_settings_document()
         enrich = bool(data.get("enrich", False)) and settings.get("google_places_enabled", True)
         auto_clean = bool(data.get("auto_clean", settings.get("auto_clean_enabled", False)))
-        limit = data.get("limit") or settings.get("default_collection_limit")
+        raw_limit = data.get("limit") or settings.get("default_collection_limit")
+        limit = to_bounded_int(raw_limit, default=200, minimum=1, maximum=5000)
 
         if not state:
             return jsonify({"error": "state is required"}), 400
@@ -604,7 +725,7 @@ def register_routes(app):
         try:
             cemeteries = fetch_cemeteries_by_state(state, enrich_address=True)
             if limit:
-                cemeteries = cemeteries[: int(limit)]
+                cemeteries = cemeteries[:limit]
 
             for cemetery in cemeteries:
                 try:
@@ -680,8 +801,12 @@ def register_routes(app):
         payload["added_by"] = "admin"
         payload["created_at"] = datetime.now(timezone.utc).isoformat()
         payload = apply_record_fallbacks(payload)
-
-        result = collection.insert_one(payload)
+        try:
+            result = collection.insert_one(payload)
+        except Exception as exc:
+            if "duplicate key error" in str(exc).lower():
+                return jsonify({"error": "Duplicate cemetery record"}), 409
+            raise
         payload["_id"] = str(result.inserted_id)
         return jsonify({"success": True, "cemetery": payload}), 201
 
@@ -697,7 +822,7 @@ def register_routes(app):
         try:
             result = collection.update_one({"_id": ObjectId(cemetery_id)}, {"$set": payload})
         except Exception:
-            return jsonify({"error": "Invalid ID"}), 400
+            return jsonify({"error": "Invalid ID or duplicate data"}), 400
         if result.matched_count == 0:
             return jsonify({"error": "Not found"}), 404
         return jsonify({"success": True})
@@ -714,4 +839,3 @@ def register_routes(app):
             return jsonify({"error": "Not found"}), 404
         return jsonify({"success": True})
 
-    app.secret_key = os.environ.get("SECRET_KEY", "cemetery-secret-key-2024")

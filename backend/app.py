@@ -17,6 +17,7 @@ if os.path.exists(_backend_env):
 
 from flask import Flask, send_from_directory, request
 from flask_cors import CORS
+from werkzeug.exceptions import HTTPException
 
 try:
     from backend.db import init_db
@@ -27,16 +28,19 @@ except ImportError:  # pragma: no cover
     from routes import register_routes
 
 
+def _parse_allowed_origins(raw_value):
+    return [origin.strip() for origin in (raw_value or "").split(",") if origin.strip()]
+
+
 def create_app():
     # Serve React build from frontend/dist
     dist_path = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist')
 
-    app = Flask(
-        __name__,
-        static_folder=dist_path,
-        static_url_path=''
-    )
+    # Keep Flask static routing disabled so React client routes
+    # (e.g. `/admin`, `/admin/login`) always fall through to SPA catch-all.
+    app = Flask(__name__)
     app.secret_key = os.environ.get('SECRET_KEY', 'cemetery-dev-secret-change-in-prod')
+    app.config["IS_PRODUCTION"] = os.environ.get("APP_ENV", "").lower() == "production"
 
     # Cookie settings required when frontend and backend are on different domains (Vercel ↔ Render).
     # In production (HTTPS), cookies must be Secure + SameSite=None to be sent cross-site.
@@ -47,15 +51,30 @@ def create_app():
     app.config["SESSION_COOKIE_SECURE"] = (
         os.environ.get("SESSION_COOKIE_SECURE", str(default_secure)).lower() == "true"
     )
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+
+    if app.config["IS_PRODUCTION"]:
+        if app.secret_key in {"", "cemetery-dev-secret-change-in-prod"}:
+            raise RuntimeError("SECRET_KEY must be set to a strong value in production.")
+        if app.config["SESSION_COOKIE_SAMESITE"] != "None":
+            app.logger.warning("SESSION_COOKIE_SAMESITE should be 'None' in production for cross-site admin login.")
+        if not app.config["SESSION_COOKIE_SECURE"]:
+            app.logger.warning("SESSION_COOKIE_SECURE should be true in production.")
+
+    allowed_origins = _parse_allowed_origins(
+        os.environ.get("FRONTEND_ORIGIN") or os.environ.get("CORS_ALLOWED_ORIGINS")
+    )
+    allow_all_origins = not app.config["IS_PRODUCTION"] and not allowed_origins
+    cors_origins = "*" if allow_all_origins else allowed_origins
 
     CORS(
         app,
-        # Use bearer-token auth from frontend; keep CORS permissive to avoid preview-domain failures.
+        # Production uses explicit allowlist; local dev stays permissive.
         supports_credentials=False,
         allow_headers=["Content-Type", "Authorization"],
         resources={
-            r"/api/*": {"origins": "*"},
-            r"/admin/*": {"origins": "*"},
+            r"/api/*": {"origins": cors_origins},
+            r"/admin/*": {"origins": cors_origins},
         },
     )
 
@@ -64,10 +83,16 @@ def create_app():
         # Hard fallback so browser never blocks API/admin requests due to missing CORS headers.
         if request.path.startswith("/api/") or request.path.startswith("/admin/"):
             origin = request.headers.get("Origin") or "*"
-            response.headers["Access-Control-Allow-Origin"] = origin
+            if allow_all_origins:
+                response.headers["Access-Control-Allow-Origin"] = origin
+            elif origin and origin in allowed_origins:
+                response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,OPTIONS"
             response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
             response.headers["Vary"] = "Origin"
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            response.headers["X-Frame-Options"] = "DENY"
+            response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         return response
 
     @app.before_request
@@ -77,6 +102,9 @@ def create_app():
             request.path.startswith("/api/") or request.path.startswith("/admin/")
         ):
             return ("", 204)
+        # `/admin/login` is a React route; serve SPA index for direct browser hits.
+        if request.method == "GET" and request.path == "/admin/login":
+            return send_from_directory(dist_path, "index.html")
 
     try:
         init_db(app)
@@ -101,10 +129,16 @@ def create_app():
 
     @app.errorhandler(Exception)
     def _api_json_error(err):
+        path = (getattr(request, "path", "") or "")
+
+        # Preserve HTTP status codes (404/405/etc.) instead of converting to 500.
+        if isinstance(err, HTTPException):
+            if path.startswith("/api/") or path.startswith("/admin/"):
+                return {"error": err.description or err.name}, err.code
+            return err
+
         # Never return HTML for API/admin failures; frontend expects JSON.
-        if (getattr(request, "path", "") or "").startswith("/api/") or (
-            getattr(request, "path", "") or ""
-        ).startswith("/admin/"):
+        if path.startswith("/api/") or path.startswith("/admin/"):
             app.logger.exception("Unhandled API/admin error")
             return {"error": str(err) or "Internal server error"}, 500
         raise err
@@ -114,8 +148,8 @@ def create_app():
     @app.route('/<path:path>')
     def serve_react(path):
 
-    # 🔥 VERY IMPORTANT: skip API routes
-        if path.startswith("api"):
+        # Skip API route namespace from SPA fallback.
+        if path == "api" or path.startswith("api/"):
             return {"error": "API route not found"}, 404
 
     # serve static files if exist
@@ -132,14 +166,8 @@ def create_app():
 if __name__ == '__main__':
     app = create_app()
     port = int(os.environ.get('PORT', 5000))
-    debug = os.environ.get('FLASK_DEBUG', 'true').lower() == 'true'
+    debug = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     print(f"\n[CemeteryBase] Running at http://localhost:{port}")
     print(f"   Admin dashboard: http://localhost:{port}/admin")
     print(f"   API:             http://localhost:{port}/api/cemeteries\n")
     app.run(debug=debug, port=port)
-
-
-#hello ius
-#he
-#bhai kya bhua
-#hr

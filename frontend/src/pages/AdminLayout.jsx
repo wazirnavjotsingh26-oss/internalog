@@ -35,9 +35,10 @@ export default function AdminLayout() {
   const location = useLocation()
   const [collapsed, setCollapsed] = useState(false)
   const [authed, setAuthed] = useState(null)
+  const logoIsActive = location.pathname === '/admin' || location.pathname === '/admin/'
 
   useEffect(() => {
-    apiFetch('/api/admin/check', { credentials: 'include' })
+    apiFetch('/api/admin/check')
       .then(async r => {
         const data = await r.json()
         setAuthed(Boolean(data.authenticated))
@@ -46,7 +47,7 @@ export default function AdminLayout() {
   }, [])
 
   async function logout() {
-    await apiFetch('/admin/logout', { credentials: 'include' })
+    await apiFetch('/admin/logout')
     setAdminToken('')
     navigate('/admin/login')
   }
@@ -67,35 +68,48 @@ export default function AdminLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex">
+    <div className="min-h-screen bg-[#0a0a0a] flex flex-col md:flex-row">
       {/* Sidebar */}
-      <aside className={`${collapsed ? 'w-14' : 'w-52'} bg-[#090909] border-r border-[#161616] flex flex-col transition-all duration-200 shrink-0`}>
+      <aside className={`${collapsed ? 'md:w-14' : 'md:w-52'} w-full md:w-auto bg-[#090909] border-b md:border-b-0 md:border-r border-[#161616] flex md:flex-col transition-all duration-200 shrink-0`}>
         {/* Logo */}
-        <div className={`flex items-center gap-2.5 px-4 py-4 border-b border-[#161616] ${collapsed ? 'justify-center' : ''}`}>
-          <div className="w-7 h-7 rounded-full bg-gold flex items-center justify-center text-[#0a0a0a] font-bold font-display text-xs shrink-0">CB</div>
-          {!collapsed && <span className="text-[10px] font-semibold tracking-[0.16em] uppercase text-[#5a5550]">CemeteryBase</span>}
-        </div>
+        <button
+          type="button"
+          onClick={() => navigate('/admin')}
+          className={`group hidden md:flex items-center gap-2.5 px-4 py-4 border-b border-[#161616] w-full text-left transition-all outline-none focus-visible:ring-2 focus-visible:ring-gold/60 ${
+            logoIsActive ? 'bg-gold/5' : 'hover:bg-[#101010]'
+          } ${collapsed ? 'justify-center' : ''}`}
+          aria-label="Open admin overview"
+        >
+          <div className="w-7 h-7 rounded-full bg-gold flex items-center justify-center text-[#0a0a0a] font-bold font-display text-xs shrink-0 ring-1 ring-gold/40 transition-all group-hover:shadow-[0_0_12px_rgba(201,168,76,0.35)]">CB</div>
+          {!collapsed && (
+            <span className={`text-[10px] font-semibold tracking-[0.16em] uppercase transition-colors ${
+              logoIsActive ? 'text-gold' : 'text-[#5a5550] group-hover:text-[#a09a8e]'
+            }`}>
+              CemeteryBase
+            </span>
+          )}
+        </button>
 
         {/* Nav */}
-        <nav className="flex-1 px-2 py-3 space-y-0.5">
+        <nav className="flex-1 px-2 py-2 md:py-3 space-y-0.5 flex md:block overflow-x-auto md:overflow-visible">
           {navItems.map(item => (
             <button
               key={item.id}
               onClick={() => navigate(item.path)}
-              className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg transition-colors text-left ${
+              className={`w-auto md:w-full flex items-center gap-2 md:gap-3 px-2.5 py-2 rounded-lg transition-colors text-left whitespace-nowrap ${
                 isActive(item.path)
                   ? 'bg-gold/10 text-gold'
                   : 'text-[#3a3a3a] hover:text-[#5a5550] hover:bg-[#111111]'
               }`}
             >
               <span className="shrink-0">{item.icon}</span>
-              {!collapsed && <span className="text-xs font-medium truncate">{item.label}</span>}
+              {!collapsed && <span className="text-xs font-medium truncate hidden sm:inline md:inline">{item.label}</span>}
             </button>
           ))}
         </nav>
 
         {/* Footer */}
-        <div className="px-2 py-3 border-t border-[#161616] space-y-0.5">
+        <div className="hidden md:block px-2 py-3 border-t border-[#161616] space-y-0.5">
           <button
             onClick={() => navigate('/')}
             className="w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-[#3a3a3a] hover:text-[#5a5550] hover:bg-[#111111] transition-colors"
@@ -126,7 +140,7 @@ export default function AdminLayout() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
-        <div className="max-w-5xl mx-auto px-8 py-8">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8">
           <Routes>
             <Route index element={<Overview />} />
             <Route path="cemeteries" element={<Cemeteries />} />

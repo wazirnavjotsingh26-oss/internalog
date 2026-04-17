@@ -15,7 +15,7 @@ export default function Settings() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    apiFetch('/api/admin/settings', { credentials: 'include' })
+    apiFetch('/api/admin/settings')
       .then(async res => {
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Failed to load settings')
@@ -30,10 +30,15 @@ export default function Settings() {
       .catch(err => setError(err.message))
   }, [])
 
-  function copy(key, value) {
-    navigator.clipboard.writeText(value)
-    setCopied(key)
-    setTimeout(() => setCopied(null), 1500)
+  async function copy(key, value) {
+    try {
+      if (!navigator?.clipboard?.writeText) throw new Error('Clipboard API unavailable')
+      await navigator.clipboard.writeText(value)
+      setCopied(key)
+      setTimeout(() => setCopied(null), 1500)
+    } catch {
+      setError('Unable to copy to clipboard in this browser context.')
+    }
   }
 
   function updateField(key, value) {
@@ -47,7 +52,6 @@ export default function Settings() {
     try {
       const res = await apiFetch('/api/admin/settings', {
         method: 'PUT',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       })

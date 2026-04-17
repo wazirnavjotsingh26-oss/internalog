@@ -66,6 +66,7 @@ export default function Cemeteries() {
     setSelectedState('')
     setSelectedCounty('')
     setSelectedCity('')
+    setPage(0)
   }, [selectedCountry])
 
   useEffect(() => {
@@ -84,12 +85,13 @@ export default function Cemeteries() {
     if (selectedCity) p.set('city', selectedCity)
     if (search.trim()) p.set('search', search.trim())
     try {
-      const r = await apiFetch(`/api/cemeteries?${p}`, { credentials: 'include' })
+      const r = await apiFetch(`/api/cemeteries?${p}`)
       const d = await r.json()
+      if (!r.ok) throw new Error(d.error || 'Failed to load cemetery records.')
       setRows(d.data || [])
       setTotal(d.total || 0)
-    } catch {
-      setActionError('Failed to load cemetery records.')
+    } catch (err) {
+      setActionError(err.message || 'Failed to load cemetery records.')
     }
     setLoading(false)
   }
@@ -123,19 +125,27 @@ export default function Cemeteries() {
     setBusyId(id)
     setActionError('')
     setActionSuccess('')
-    const res = await apiFetch(`/api/cemeteries/${id}`, { method: 'DELETE', credentials: 'include' })
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}))
-      setActionError(data.error || 'Delete failed.')
+    try {
+      const res = await apiFetch(`/api/cemeteries/${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setActionError(data.error || 'Delete failed.')
+        setBusyId('')
+        return
+      }
+      setRows(prev => prev.filter(row => row._id !== id))
+      setTotal(prev => Math.max(prev - 1, 0))
+      setActionSuccess(`Deleted "${name}" successfully.`)
+      setBusyId('')
+      if (isLastRowOnPage && page > 0) {
+        setPage(prev => prev - 1)
+      } else {
+        load()
+      }
+    } catch (err) {
+      setActionError(err.message || 'Network error while deleting.')
       setBusyId('')
       return
-    }
-    setRows(prev => prev.filter(row => row._id !== id))
-    setTotal(prev => Math.max(prev - 1, 0))
-    setActionSuccess(`Deleted "${name}" successfully.`)
-    setBusyId('')
-    if (isLastRowOnPage && page > 0) {
-      setPage(prev => prev - 1)
     }
   }
 
@@ -169,12 +179,12 @@ export default function Cemeteries() {
   return (
     <div>
       {/* ── Header ── */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-5">
         <div>
           <h1 className="font-display text-2xl font-semibold text-[#e8e4dc]">Cemeteries</h1>
           <p className="text-[#5a5550] text-sm">Auto-collected cemetery records via OSM pipeline → saved to MongoDB Atlas.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => exportFile('counties')}
             className="flex items-center gap-1.5 bg-[#111111] border border-[#2a2a2a] text-[#a09a8e] text-xs px-3 py-2 rounded-lg hover:border-[#3a3a3a] transition-colors"
@@ -261,7 +271,7 @@ export default function Cemeteries() {
           {cities.map(city => <option key={city} value={city}>{city}</option>)}
         </select>
       </div>
-      <div className="mb-4 flex items-center justify-between text-xs text-[#5a5550]">
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-[#5a5550]">
         <span>{total.toLocaleString()} records available</span>
         <button
           onClick={load}
@@ -365,7 +375,7 @@ export default function Cemeteries() {
 
       {/* ── Pagination ── */}
       {total > PAGE && (
-        <div className="flex items-center justify-between mt-4 text-xs text-[#3a3a3a]">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-4 text-xs text-[#3a3a3a]">
           <span>{total.toLocaleString()} total records</span>
           <div className="flex items-center gap-3">
             <button onClick={() => setPage(p=>p-1)} disabled={page===0} className="disabled:opacity-30 hover:text-[#5a5550] transition-colors">← Prev</button>

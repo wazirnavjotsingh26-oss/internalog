@@ -9,7 +9,7 @@ export default function ApiLogs() {
   async function loadLogs() {
     setLoading(true)
     setError('')
-    apiFetch('/api/admin/logs?limit=100', { credentials: 'include' })
+    apiFetch('/api/admin/logs?limit=100')
       .then(async res => {
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Failed to load API logs')
@@ -46,8 +46,8 @@ export default function ApiLogs() {
           {error}
         </div>
       )}
-      <div className="bg-[#111111] border border-[#1e1e1e] rounded-xl overflow-hidden">
-        <table className="w-full text-xs">
+      <div className="bg-[#111111] border border-[#1e1e1e] rounded-xl overflow-x-auto">
+        <table className="w-full min-w-[720px] text-xs">
           <thead>
             <tr className="bg-[#0e0e0e] border-b border-[#1e1e1e]">
               {['Time','Method','Path','Status','Latency'].map(h => (

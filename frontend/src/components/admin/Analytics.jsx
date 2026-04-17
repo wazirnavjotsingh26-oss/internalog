@@ -12,7 +12,7 @@ export default function Analytics() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    apiFetch('/api/admin/analytics', { credentials: 'include' })
+    apiFetch('/api/admin/analytics')
       .then(async res => {
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Failed to load analytics')
@@ -59,7 +59,7 @@ export default function Analytics() {
       )}
 
       {/* Top: Health Score + Field Completion */}
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
         {/* Health Score */}
         <div className="bg-[#111111] border border-[#1e1e1e] rounded-xl p-5 flex flex-col items-center">
           <h2 className="font-display text-xs font-semibold uppercase tracking-widest text-[#a09a8e] mb-4 self-start">Data Health Score</h2>
@@ -98,7 +98,7 @@ export default function Analytics() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
         {[
           { label: 'Complete Records', value: complete, tone: 'text-emerald-400' },
           { label: 'Partial Records', value: partial, tone: 'text-amber-400' },
@@ -114,7 +114,7 @@ export default function Analytics() {
       {/* Source Distribution */}
       <div className="bg-[#111111] border border-[#1e1e1e] rounded-xl p-5">
         <h2 className="font-display text-xs font-semibold uppercase tracking-widest text-[#a09a8e] mb-4">Source Distribution</h2>
-        <div className="flex items-center gap-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 sm:gap-8">
           <div className="w-32 h-32 shrink-0">
             <Doughnut
               data={sourceData}

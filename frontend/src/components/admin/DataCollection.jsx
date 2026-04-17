@@ -35,7 +35,7 @@ export default function DataCollection() {
   }, [logs])
 
   useEffect(() => {
-    apiFetch('/api/admin/settings', { credentials: 'include' })
+    apiFetch('/api/admin/settings')
       .then(async res => {
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Failed to load settings')
@@ -136,11 +136,14 @@ export default function DataCollection() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ state, enrich: googleEnrich, auto_clean: autoClean, limit }),
-          credentials: 'include',
         })
         const data = await readJsonSafe(res)
         if (!res.ok || data.error) {
           addLog(`Error: ${data.error}`, 'error')
+          setStats(prev => ({
+            ...prev,
+            failed: prev.failed + 1,
+          }))
         } else {
           addLog(`Fetched ${data.fetched} records from source providers`, 'info')
           if (dedup) addLog(`Deduplication: ${data.skipped} duplicates removed`, 'success')
@@ -154,6 +157,10 @@ export default function DataCollection() {
         }
       } catch (e) {
         addLog(`Connection error: ${e.message}`, 'error')
+        setStats(prev => ({
+          ...prev,
+          failed: prev.failed + 1,
+        }))
       }
 
       setProgress(Math.round(((i + 1) / selectedStates.length) * 100))
@@ -200,7 +207,7 @@ export default function DataCollection() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {/* Config Panel */}
         <div className="bg-[#111111] border border-[#1e1e1e] rounded-xl p-5">
           <h2 className="font-display text-xs font-semibold uppercase tracking-widest text-[#a09a8e] mb-4">Configuration</h2>
