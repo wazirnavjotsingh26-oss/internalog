@@ -59,6 +59,17 @@ def create_app():
         },
     )
 
+    @app.after_request
+    def _force_cors_headers(response):
+        # Hard fallback so browser never blocks API/admin requests due to missing CORS headers.
+        if request.path.startswith("/api/") or request.path.startswith("/admin/"):
+            origin = request.headers.get("Origin") or "*"
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+            response.headers["Vary"] = "Origin"
+        return response
+
     try:
         init_db(app)
     except Exception as e:
@@ -113,3 +124,4 @@ if __name__ == '__main__':
 #hello ius
 #he
 #bhai kya bhua
+#hr
