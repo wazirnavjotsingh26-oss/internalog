@@ -246,3 +246,16 @@ For production, consider:
 
 For research, genealogy, and educational purposes.
 Data sourced from OpenStreetMap (ODbL), Nominatim, and Google Places API.
+
+
+// Future me avoid kaise kare:
+Kabhi bhi detached HEAD me kaam mat kar
+Always:
+git checkout main
+git pull
+# then changes
+git add .
+git commit -m "msg"
+git push
+
+Agar tu chahe toh main tujhe visual diagram (flowchart) + real-world Git workflow bana ke de deta hoon — ek baar samajh gaya toh kabhi phasoge nahi.

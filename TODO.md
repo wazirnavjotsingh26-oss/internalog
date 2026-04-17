@@ -8,4 +8,3 @@
 ### [✅] 4. Backend fixes — Syntax error resolved
 
 **Project fully functional!** Run `cd backend & python app.py` to start.
-
