@@ -9,6 +9,7 @@ from io import StringIO
 import csv
 import os
 import re
+import threading
 import time
 
 from bson import ObjectId
@@ -29,6 +30,7 @@ except ImportError:  # pragma: no cover
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
 SETTINGS_COLLECTION = "app_settings"
 SETTINGS_DOC_ID = "admin_settings"
+COLLECT_JOBS_COLLECTION = "collect_jobs"
 API_LOG_LIMIT = 250
 DEFAULT_COUNTRY = "United States"
 
@@ -702,6 +704,166 @@ def register_routes(app):
             headers={"Content-Disposition": "attachment; filename=county_export.csv"},
         )
 
+    def get_collect_jobs_collection():
+        return get_collection().database[COLLECT_JOBS_COLLECTION]
+
+    def serialize_collect_job(doc):
+        if not doc:
+            return None
+        out = dict(doc)
+        out["_id"] = str(out["_id"])
+        return out
+
+    def run_state_collection(state, enrich, auto_clean, limit, progress_hook=None):
+        """
+        Fetch OSM (+ optional Google) records for one state and upsert into Mongo.
+        progress_hook(idx, total, counts) called occasionally during the per-record loop.
+        """
+        collection = get_collection()
+        inserted = 0
+        updated = 0
+        skipped = 0
+        errors = []
+
+        cemeteries = fetch_cemeteries_by_state(state, enrich_address=True)
+        if limit:
+            cemeteries = cemeteries[:limit]
+        total = len(cemeteries)
+
+        for idx, cemetery in enumerate(cemeteries, start=1):
+            try:
+                if enrich and cemetery.get("latitude") and cemetery.get("longitude"):
+                    google_data = enrich_with_google(
+                        cemetery["name"],
+                        cemetery["latitude"],
+                        cemetery["longitude"],
+                    )
+                    if google_data:
+                        cemetery["phone"] = google_data.get("phone") or cemetery.get("phone")
+                        cemetery["website"] = google_data.get("website") or cemetery.get("website")
+                        cemetery["opening_hours"] = (
+                            google_data.get("opening_hours") or cemetery.get("opening_hours")
+                        )
+                        if google_data.get("address"):
+                            cemetery["address"] = google_data["address"]
+                        cemetery["data_source"] = "Google+OSM"
+
+                if auto_clean:
+                    cemetery["name"] = " ".join(str(cemetery.get("name", "")).split())
+                    for key in ("address", "city", "county", "state"):
+                        if cemetery.get(key):
+                            cemetery[key] = str(cemetery[key]).strip()
+
+                cemetery = apply_record_fallbacks(cemetery)
+
+                query = {}
+                if cemetery.get("osm_id"):
+                    query["osm_id"] = cemetery["osm_id"]
+                else:
+                    query = {
+                        "name": cemetery["name"],
+                        "latitude": cemetery.get("latitude"),
+                        "longitude": cemetery.get("longitude"),
+                    }
+
+                existing = collection.find_one(query, {"_id": 1})
+                result = collection.update_one(query, {"$set": cemetery}, upsert=True)
+                if result.upserted_id:
+                    inserted += 1
+                elif existing:
+                    updated += 1
+                else:
+                    skipped += 1
+            except Exception as exc:
+                errors.append(str(exc))
+
+            if progress_hook and (idx == total or idx % 5 == 0):
+                progress_hook(
+                    idx,
+                    total,
+                    {"inserted": inserted, "updated": updated, "skipped": skipped, "errors": len(errors)},
+                )
+
+        return {
+            "state": state,
+            "fetched": total,
+            "inserted": inserted,
+            "updated": updated,
+            "skipped": skipped,
+            "errors": errors[:10],
+        }
+
+    def collect_job_worker(job_id, state, enrich, auto_clean, limit):
+        jobs = get_collect_jobs_collection()
+        try:
+
+            def on_progress(idx, total, counts):
+                jobs.update_one(
+                    {"_id": job_id},
+                    {
+                        "$set": {
+                            "updated_at": datetime.now(timezone.utc),
+                            "phase": "processing",
+                            "progress": {"done": idx, "total": total, **counts},
+                        }
+                    },
+                )
+
+            jobs.update_one(
+                {"_id": job_id},
+                {
+                    "$set": {
+                        "updated_at": datetime.now(timezone.utc),
+                        "phase": "fetching",
+                        "progress": {"done": 0, "total": 0, "inserted": 0, "updated": 0, "skipped": 0, "errors": 0},
+                    }
+                },
+            )
+            summary = run_state_collection(state, enrich, auto_clean, limit, progress_hook=on_progress)
+            jobs.update_one(
+                {"_id": job_id},
+                {
+                    "$set": {
+                        "status": "completed",
+                        "updated_at": datetime.now(timezone.utc),
+                        "phase": "done",
+                        "result": summary,
+                        "progress": {
+                            "done": summary["fetched"],
+                            "total": summary["fetched"],
+                            "inserted": summary["inserted"],
+                            "updated": summary["updated"],
+                            "skipped": summary["skipped"],
+                            "errors": len(summary.get("errors") or []),
+                        },
+                    }
+                },
+            )
+        except Exception as exc:
+            jobs.update_one(
+                {"_id": job_id},
+                {
+                    "$set": {
+                        "status": "failed",
+                        "updated_at": datetime.now(timezone.utc),
+                        "phase": "error",
+                        "error": str(exc),
+                    }
+                },
+            )
+
+    @app.route("/api/collect/jobs/<job_id>", methods=["GET"])
+    @admin_required
+    def collect_job_status(job_id):
+        try:
+            oid = ObjectId(job_id)
+        except Exception:
+            return jsonify({"error": "invalid job id"}), 400
+        doc = get_collect_jobs_collection().find_one({"_id": oid})
+        if not doc:
+            return jsonify({"error": "job not found"}), 404
+        return jsonify({"job": serialize_collect_job(doc)})
+
     @app.route("/api/collect", methods=["POST"])
     @admin_required
     def collect_data():
@@ -712,78 +874,56 @@ def register_routes(app):
         auto_clean = bool(data.get("auto_clean", settings.get("auto_clean_enabled", False)))
         raw_limit = data.get("limit") or settings.get("default_collection_limit")
         limit = to_bounded_int(raw_limit, default=200, minimum=1, maximum=5000)
+        use_async = bool(data.get("async", True))
 
         if not state:
             return jsonify({"error": "state is required"}), 400
 
-        collection = get_collection()
-        inserted = 0
-        updated = 0
-        skipped = 0
-        errors = []
+        if use_async:
+            jobs = get_collect_jobs_collection()
+            job_id = ObjectId()
+            now = datetime.now(timezone.utc)
+            jobs.insert_one(
+                {
+                    "_id": job_id,
+                    "status": "running",
+                    "phase": "queued",
+                    "created_at": now,
+                    "updated_at": now,
+                    "params": {
+                        "state": state,
+                        "enrich": enrich,
+                        "auto_clean": auto_clean,
+                        "limit": limit,
+                    },
+                    "progress": None,
+                    "result": None,
+                    "error": None,
+                }
+            )
+            thread = threading.Thread(
+                target=collect_job_worker,
+                args=(job_id, state, enrich, auto_clean, limit),
+                daemon=True,
+            )
+            thread.start()
+            return (
+                jsonify(
+                    {
+                        "accepted": True,
+                        "job_id": str(job_id),
+                        "poll_url": f"/api/collect/jobs/{job_id}",
+                    }
+                ),
+                202,
+            )
 
         try:
-            cemeteries = fetch_cemeteries_by_state(state, enrich_address=True)
-            if limit:
-                cemeteries = cemeteries[:limit]
-
-            for cemetery in cemeteries:
-                try:
-                    if enrich and cemetery.get("latitude") and cemetery.get("longitude"):
-                        google_data = enrich_with_google(
-                            cemetery["name"],
-                            cemetery["latitude"],
-                            cemetery["longitude"],
-                        )
-                        if google_data:
-                            cemetery["phone"] = google_data.get("phone") or cemetery.get("phone")
-                            cemetery["website"] = google_data.get("website") or cemetery.get("website")
-                            cemetery["opening_hours"] = google_data.get("opening_hours") or cemetery.get("opening_hours")
-                            if google_data.get("address"):
-                                cemetery["address"] = google_data["address"]
-                            cemetery["data_source"] = "Google+OSM"
-
-                    if auto_clean:
-                        cemetery["name"] = " ".join(str(cemetery.get("name", "")).split())
-                        for key in ("address", "city", "county", "state"):
-                            if cemetery.get(key):
-                                cemetery[key] = str(cemetery[key]).strip()
-
-                    cemetery = apply_record_fallbacks(cemetery)
-
-                    query = {}
-                    if cemetery.get("osm_id"):
-                        query["osm_id"] = cemetery["osm_id"]
-                    else:
-                        query = {
-                            "name": cemetery["name"],
-                            "latitude": cemetery.get("latitude"),
-                            "longitude": cemetery.get("longitude"),
-                        }
-
-                    existing = collection.find_one(query, {"_id": 1})
-                    result = collection.update_one(query, {"$set": cemetery}, upsert=True)
-                    if result.upserted_id:
-                        inserted += 1
-                    elif existing:
-                        updated += 1
-                    else:
-                        skipped += 1
-                except Exception as exc:
-                    errors.append(str(exc))
+            summary = run_state_collection(state, enrich, auto_clean, limit)
         except Exception as exc:
             return jsonify({"error": str(exc)}), 500
 
-        return jsonify(
-            {
-                "state": state,
-                "fetched": len(cemeteries),
-                "inserted": inserted,
-                "updated": updated,
-                "skipped": skipped,
-                "errors": errors[:10],
-            }
-        )
+        return jsonify(summary)
 
     @app.route("/api/cemeteries", methods=["POST"])
     @admin_required

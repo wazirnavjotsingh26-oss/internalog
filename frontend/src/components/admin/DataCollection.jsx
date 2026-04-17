@@ -67,6 +67,30 @@ export default function DataCollection() {
     }
   }
 
+  function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms))
+  }
+
+  async function waitForCollectJob(jobId, onTick) {
+    let wait = 400
+    const maxWait = 4000
+    for (;;) {
+      const res = await apiFetch(`/api/collect/jobs/${jobId}`)
+      const data = await readJsonSafe(res)
+      if (!res.ok || data.error) {
+        throw new Error(data.error || `HTTP ${res.status}`)
+      }
+      const job = data.job
+      if (onTick) onTick(job)
+      const status = job?.status
+      if (status === 'completed' || status === 'failed') {
+        return job
+      }
+      await delay(wait)
+      wait = Math.min(Math.round(wait * 1.35), maxWait)
+    }
+  }
+
   function setCheck(name, ok, details) {
     setHealthChecks(prev => {
       const rest = prev.filter(item => item.name !== name)
@@ -135,10 +159,46 @@ export default function DataCollection() {
         const res = await apiFetch('/api/collect', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ state, enrich: googleEnrich, auto_clean: autoClean, limit }),
+          body: JSON.stringify({
+            state,
+            enrich: googleEnrich,
+            auto_clean: autoClean,
+            limit,
+            async: true,
+          }),
         })
         const data = await readJsonSafe(res)
-        if (!res.ok || data.error) {
+        if (res.status === 202 && data.job_id) {
+          addLog(`Job ${data.job_id} queued — streaming progress…`, 'info')
+          const finished = await waitForCollectJob(data.job_id, job => {
+            const p = job?.progress
+            if (p && p.total > 0) {
+              const frac = Math.min(1, p.done / p.total)
+              setProgress(Math.round(((i + frac) / selectedStates.length) * 100))
+            }
+          })
+          if (finished.status === 'failed') {
+            addLog(`Error: ${finished.error || 'Collection failed'}`, 'error')
+            setStats(prev => ({
+              ...prev,
+              failed: prev.failed + 1,
+            }))
+          } else {
+            const summary = finished.result || {}
+            addLog(`Fetched ${summary.fetched ?? 0} records from source providers`, 'info')
+            if (dedup) addLog(`Deduplication: ${summary.skipped ?? 0} duplicates removed`, 'success')
+            addLog(
+              `Saved ${summary.inserted ?? 0} new records and refreshed ${summary.updated || 0} existing records`,
+              'success'
+            )
+            addLog(`Collection finished for ${state}`, 'success')
+            setStats(prev => ({
+              processed: prev.processed + (summary.fetched || 0),
+              success: prev.success + (summary.inserted || 0) + (summary.updated || 0),
+              failed: prev.failed + (summary.errors?.length || 0),
+            }))
+          }
+        } else if (!res.ok || data.error) {
           addLog(`Error: ${data.error}`, 'error')
           setStats(prev => ({
             ...prev,

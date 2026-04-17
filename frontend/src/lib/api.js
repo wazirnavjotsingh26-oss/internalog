@@ -25,8 +25,8 @@ function joinUrl(base, path) {
 }
 
 function shouldBypassProxy(path) {
-  // Long-running collection calls can hit Vercel proxy timeout; send directly to Render.
-  return path === '/api/collect' || path.startsWith('/api/collect?')
+  // Long-running collection calls can hit Vercel/proxy timeouts; send directly to Render.
+  return path === '/api/collect' || path.startsWith('/api/collect?') || path.startsWith('/api/collect/')
 }
 
 export async function apiFetch(path, options = {}) {
