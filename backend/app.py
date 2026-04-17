@@ -70,6 +70,14 @@ def create_app():
             response.headers["Vary"] = "Origin"
         return response
 
+    @app.before_request
+    def _handle_preflight():
+        # Ensure CORS preflight never 404s on API/admin endpoints.
+        if request.method == "OPTIONS" and (
+            request.path.startswith("/api/") or request.path.startswith("/admin/")
+        ):
+            return ("", 204)
+
     try:
         init_db(app)
     except Exception as e:
