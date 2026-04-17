@@ -48,24 +48,14 @@ def create_app():
         os.environ.get("SESSION_COOKIE_SECURE", str(default_secure)).lower() == "true"
     )
 
-    configured_origins = [origin.strip() for origin in os.environ.get("FRONTEND_ORIGIN", "").split(",") if origin.strip()]
-    # Always keep robust defaults so Vercel preview links work too.
-    default_origins = [
-        "http://localhost:5173",
-        "http://localhost:3000",
-        r"https://.*\.vercel\.app",
-    ]
-    for origin in default_origins:
-        if origin not in configured_origins:
-            configured_origins.append(origin)
-
     CORS(
         app,
-        supports_credentials=True,
+        # Use bearer-token auth from frontend; keep CORS permissive to avoid preview-domain failures.
+        supports_credentials=False,
         allow_headers=["Content-Type", "Authorization"],
         resources={
-            r"/api/*": {"origins": configured_origins},
-            r"/admin/*": {"origins": configured_origins},
+            r"/api/*": {"origins": "*"},
+            r"/admin/*": {"origins": "*"},
         },
     )
 
@@ -121,4 +111,5 @@ if __name__ == '__main__':
 
 
 #hello ius
+#he
 #bhai kya bhua

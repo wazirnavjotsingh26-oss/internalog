@@ -25,6 +25,9 @@ export default function DataCollection() {
   const [logs, setLogs] = useState([])
   const [progress, setProgress] = useState(0)
   const [stats, setStats] = useState({ processed: 0, success: 0, failed: 0 })
+  const [healthRunning, setHealthRunning] = useState(false)
+  const [healthChecks, setHealthChecks] = useState([])
+  const [healthAt, setHealthAt] = useState('')
   const logRef = useRef(null)
 
   useEffect(() => {
@@ -51,6 +54,58 @@ export default function DataCollection() {
   function addLog(msg, type = 'info') {
     const time = new Date().toLocaleTimeString('en-US', { hour12: false })
     setLogs(prev => [...prev, { time, msg, type }])
+  }
+
+  function setCheck(name, ok, details) {
+    setHealthChecks(prev => {
+      const rest = prev.filter(item => item.name !== name)
+      return [...rest, { name, ok, details }]
+    })
+  }
+
+  async function runHealthChecks() {
+    setHealthRunning(true)
+    setHealthChecks([])
+    const stamp = new Date().toLocaleTimeString('en-US', { hour12: false })
+    setHealthAt(stamp)
+
+    try {
+      const statsRes = await apiFetch('/api/stats')
+      setCheck(
+        'API connectivity',
+        statsRes.ok,
+        statsRes.ok ? 'Backend reachable' : `HTTP ${statsRes.status}`
+      )
+    } catch (e) {
+      setCheck('API connectivity', false, e.message || 'Request failed')
+    }
+
+    try {
+      const authRes = await apiFetch('/api/admin/check')
+      const authData = await authRes.json().catch(() => ({}))
+      setCheck(
+        'Admin auth',
+        authRes.ok && Boolean(authData.authenticated),
+        authRes.ok
+          ? (authData.authenticated ? 'Authenticated' : 'Not authenticated')
+          : `HTTP ${authRes.status}`
+      )
+    } catch (e) {
+      setCheck('Admin auth', false, e.message || 'Request failed')
+    }
+
+    try {
+      const optionsRes = await apiFetch('/api/collect', { method: 'OPTIONS' })
+      setCheck(
+        'Collect endpoint',
+        optionsRes.ok,
+        optionsRes.ok ? 'CORS preflight OK' : `HTTP ${optionsRes.status}`
+      )
+    } catch (e) {
+      setCheck('Collect endpoint', false, e.message || 'Request failed')
+    }
+
+    setHealthRunning(false)
   }
 
   async function startCollection() {
@@ -102,6 +157,36 @@ export default function DataCollection() {
       <div className="mb-5">
         <h1 className="font-display text-2xl font-semibold text-[#e8e4dc]">Data Collection</h1>
         <p className="text-[#5a5550] text-sm">Auto-collect cemetery data from OpenStreetMap (OSM) by state — no manual entry needed.</p>
+      </div>
+
+      <div className="mb-4 bg-[#111111] border border-[#1e1e1e] rounded-xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-display text-xs font-semibold uppercase tracking-widest text-[#a09a8e]">System Health</h2>
+          <button
+            onClick={runHealthChecks}
+            disabled={healthRunning}
+            className="px-3 py-1.5 rounded-lg border border-[#2a2a2a] text-xs text-[#a09a8e] hover:border-[#3a3a3a] disabled:opacity-50 transition-colors"
+          >
+            {healthRunning ? 'Checking...' : 'Run Checks'}
+          </button>
+        </div>
+        {healthAt && (
+          <p className="text-[10px] text-[#3a3a3a] mb-2">Last run: {healthAt}</p>
+        )}
+        {healthChecks.length === 0 ? (
+          <p className="text-xs text-[#5a5550]">Run checks before collection to validate API, auth, and collect endpoint.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            {healthChecks.map(check => (
+              <div key={check.name} className={`rounded-lg border px-3 py-2 ${check.ok ? 'border-emerald-500/20 bg-emerald-500/10' : 'border-red-500/20 bg-red-500/10'}`}>
+                <div className={`text-xs font-semibold ${check.ok ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {check.ok ? '✓' : '✗'} {check.name}
+                </div>
+                <div className="text-[11px] text-[#a09a8e] mt-1">{check.details}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
