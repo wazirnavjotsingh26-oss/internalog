@@ -864,6 +864,29 @@ def register_routes(app):
             return jsonify({"error": "job not found"}), 404
         return jsonify({"job": serialize_collect_job(doc)})
 
+    @app.route("/api/collect", methods=["GET"])
+    def collect_endpoint_info():
+        # Opening this URL in a browser sends GET; collection is POST-only.
+        return jsonify(
+            {
+                "endpoint": "/api/collect",
+                "message": "Collection is triggered with POST, not GET.",
+                "method": "POST",
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer <admin_jwt>",
+                },
+                "body": {
+                    "state": "required (e.g. California)",
+                    "enrich": "optional bool",
+                    "auto_clean": "optional bool",
+                    "limit": "optional int (1–5000)",
+                    "async": "optional bool (default true) — returns 202 + job_id",
+                },
+                "poll": "GET /api/collect/jobs/<job_id> until status is completed or failed",
+            }
+        )
+
     @app.route("/api/collect", methods=["POST"])
     @admin_required
     def collect_data():
