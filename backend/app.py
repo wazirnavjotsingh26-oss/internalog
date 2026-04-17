@@ -99,6 +99,16 @@ def create_app():
         # If db module import fails, don't block app startup.
         pass
 
+    @app.errorhandler(Exception)
+    def _api_json_error(err):
+        # Never return HTML for API/admin failures; frontend expects JSON.
+        if (getattr(request, "path", "") or "").startswith("/api/") or (
+            getattr(request, "path", "") or ""
+        ).startswith("/admin/"):
+            app.logger.exception("Unhandled API/admin error")
+            return {"error": str(err) or "Internal server error"}, 500
+        raise err
+
     # Catch-all: serve React index.html for any non-API route
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')

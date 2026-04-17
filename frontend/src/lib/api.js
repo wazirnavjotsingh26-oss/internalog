@@ -41,9 +41,9 @@ export async function apiFetch(path, options = {}) {
     ...options,
     headers,
   }
-
-  // Cross-site cookies are unreliable in private mode; rely on bearer token auth.
-  delete requestOptions.credentials
+  if (!requestOptions.credentials) {
+    requestOptions.credentials = 'include'
+  }
 
   return fetch(url, requestOptions)
 }
