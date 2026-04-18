@@ -18,15 +18,26 @@ export default function AdminLogin() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
       })
-      const data = await res.json()
+      const text = await res.text()
+      let data = {}
+      try {
+        data = text ? JSON.parse(text) : {}
+      } catch {
+        setError(`Server returned non-JSON (HTTP ${res.status}). Check Render URL in src/deployConfig.js and vercel.json.`)
+        setLoading(false)
+        return
+      }
       if (data.success) {
         if (data.token) setAdminToken(data.token)
         navigate('/admin')
       } else {
         setError(data.error || 'Invalid password')
       }
-    } catch {
-      setError('Connection error. Is the server running?')
+    } catch (err) {
+      const msg = (err && err.message) || 'Connection error.'
+      setError(
+        `${msg} Update RENDER_SERVICE_URL in src/deployConfig.js to match your live Render URL, mirror it in vercel.json, redeploy Vercel, and set CORS_ALLOWED_ORIGINS on Render.`
+      )
     }
     setLoading(false)
   }

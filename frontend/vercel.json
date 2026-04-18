@@ -3,15 +3,15 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://intern-alog-012-2.onrender.com/api/:path*"
+      "destination": "https://intern-alog-012-1zd8.onrender.com/api/:path*"
     },
     {
       "source": "/admin/login",
-      "destination": "https://intern-alog-012-2.onrender.com/admin/login"
+      "destination": "https://intern-alog-012-1zd8.onrender.com/admin/login"
     },
     {
       "source": "/admin/logout",
-      "destination": "https://intern-alog-012-2.onrender.com/admin/logout"
+      "destination": "https://intern-alog-012-1zd8.onrender.com/admin/logout"
     },
     {
       "source": "/(.*)",
