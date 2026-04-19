@@ -108,7 +108,29 @@ export default function AdminLayout() {
           ))}
         </nav>
 
-        {/* Footer */}
+        {/* Mobile: back + logout (desktop sidebar footer is md+) */}
+        <div className="flex md:hidden items-stretch gap-2 px-3 py-2.5 border-t border-[#161616] bg-[#0a0a0a]">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-2 rounded-lg border border-[#2a2a2a] bg-[#111111] px-3 text-xs font-medium text-[#a09a8e] hover:border-[#3a3a3a] hover:text-[#e8e4dc] transition-colors"
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+            Back to site
+          </button>
+          <button
+            type="button"
+            onClick={logout}
+            className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-2 rounded-lg border border-red-500/25 bg-red-500/5 px-3 text-xs font-medium text-red-400/90 hover:bg-red-500/10 hover:border-red-500/40 transition-colors"
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H9m4 4v1a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h5a2 2 0 012 2v1"/>
+            </svg>
+            Log out
+          </button>
+        </div>
+
+        {/* Footer (desktop sidebar) */}
         <div className="hidden md:block px-2 py-3 border-t border-[#161616] space-y-0.5">
           <button
             onClick={() => navigate('/')}
