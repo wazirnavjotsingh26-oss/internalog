@@ -40,7 +40,7 @@ def process_state(state_name, enrich=False, collection=None, limit=None):
     print(f"{'='*60}")
 
     # 🔥 Safety cap for batch size (performance control)
-    max_items = limit or 100 // 50
+    max_items = limit or 50
 
     try:
         cemeteries = fetch_cemeteries_by_state(state_name, enrich_address=True)

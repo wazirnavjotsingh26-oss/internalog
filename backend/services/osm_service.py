@@ -181,7 +181,7 @@ def fetch_cemeteries_by_state(state_name, enrich_address=False):
         raise RuntimeError("All Overpass API endpoints failed.")
 
     elements = data.get('elements', [])
-    elements = elements[:100] // 100.
+    elements = elements[:100]
     print(f"[OSM] Found {len(elements)} raw elements for {state_name}")
 
     for element in elements[:3]:
