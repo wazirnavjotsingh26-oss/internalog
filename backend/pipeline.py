@@ -25,6 +25,7 @@ from services.osm_service import fetch_cemeteries_by_state, STATE_NAMES
 from services.google_service import enrich_with_google
 
 MONGO_URI = os.getenv("MONGO_URI")
+ALLOWED_TYPES = {"cemetery", "graveyard"}
 
 
 def get_collection():
@@ -67,39 +68,47 @@ def process_state(state_name, enrich=False, collection=None, limit=None):
 
             # 🔥 OPTIONAL GOOGLE ENRICHMENT
             if enrich and lat and lon:
-                if i % 10 == 0:
-                    try:
-                        google_data = enrich_with_google(
-                            cemetery['name'],
-                            lat,
-                            lon
-                        )
+                try:
+                    google_data = enrich_with_google(
+                        cemetery['name'],
+                        lat,
+                        lon
+                    )
 
-                        if google_data:
-                            cemetery['phone'] = google_data.get('phone') or cemetery.get('phone', '')
-                            cemetery['website'] = google_data.get('website') or cemetery.get('website', '')
-                            cemetery['opening_hours'] = google_data.get('opening_hours') or cemetery.get('opening_hours', '')
-                            cemetery['data_source'] = 'Google+OSM'
+                    if google_data:
+                        cemetery['phone'] = google_data.get('phone') or cemetery.get('phone', '')
+                        cemetery['website'] = google_data.get('website') or cemetery.get('website', '')
+                        cemetery['opening_hours'] = google_data.get('opening_hours') or cemetery.get('opening_hours', '')
+                        cemetery['address'] = google_data.get('address') or cemetery.get('address', '')
+                        cemetery['city'] = google_data.get('city') or cemetery.get('city', '')
+                        cemetery['county'] = google_data.get('county') or cemetery.get('county', '')
+                        cemetery['state'] = google_data.get('state') or cemetery.get('state', '')
+                        cemetery['zip_code'] = google_data.get('zip_code') or cemetery.get('zip_code', '')
+                        cemetery['data_source'] = 'Google+OSM'
 
-                    except Exception as e:
-                        print(f"[Google Warning] {e}")
+                except Exception as e:
+                    print(f"[Google Warning] {e}")
 
-                    time.sleep(0.3)
+                time.sleep(0.3)
 
             # 🔥 Final completeness fallbacks
+            cemetery['country'] = 'United States'
             if not cemetery.get('city'):
-                cemetery['city'] = cemetery.get('county') or "Unknown"
-            if not cemetery.get('phone'):
-                cemetery['phone'] = "Not Available"
-            if not cemetery.get('opening_hours'):
-                cemetery['opening_hours'] = "Not Available"
-            if not cemetery.get('website'):
-                # Fallback: Google search link
-                name = cemetery.get('name') or "Cemetery"
-                city = cemetery.get('city') or cemetery.get('county') or cemetery.get('state') or ""
-                query_parts = [name, city, "cemetery"]
-                query = "+".join(part.replace(" ", "+") for part in query_parts if part)
-                cemetery['website'] = f"https://www.google.com/search?q={query}"
+                cemetery['city'] = cemetery.get('county') or cemetery.get('state') or "United States"
+            if not cemetery.get('county'):
+                cemetery['county'] = cemetery.get('city') or cemetery.get('state') or "United States"
+            if not cemetery.get('address'):
+                cemetery['address'] = ", ".join(
+                    part for part in [cemetery.get('city', ''), cemetery.get('state', ''), cemetery.get('country', '')]
+                    if part
+                )
+            if not cemetery.get('zip_code'):
+                cemetery['zip_code'] = "00000"
+            cemetery['type'] = (
+                cemetery.get('type')
+                if str(cemetery.get('type', '')).strip().lower() in ALLOWED_TYPES
+                else 'cemetery'
+            )
 
             # 🔥 UPSERT (avoid duplicates) using osm_id as unique key
             if not cemetery.get('osm_id'):
@@ -141,7 +150,7 @@ def main():
     enrich = args.enrich and not args.no_enrich
 
     print("Cemetery Data Collection Pipeline")
-    print(f"   MongoDB: {MONGO_URI[:40]}...")
+    print("   MongoDB: configured")
     print(f"   Google enrichment: {'ON' if enrich else 'OFF'}")
 
     collection = get_collection()

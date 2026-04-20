@@ -23,6 +23,7 @@ MAX_DISTANCE_KM = 0.5
 
 # Minimum name similarity ratio to accept a match (0-1)
 MIN_NAME_SIMILARITY = 0.5
+GOOGLE_URL_RE = re.compile(r"^https?://(www\.)?(google\.[^/]+|maps\.google\.[^/]+)", re.IGNORECASE)
 
 
 def _haversine(lat1, lon1, lat2, lon2):
@@ -69,12 +70,12 @@ def _text_search(query, lat, lon):
         data = response.json()
 
         if data.get('status') not in ('OK', 'ZERO_RESULTS'):
-            print(f"[Google] Text search error: {data.get('status')} - {data.get('error_message', '')}")
+            print(f"[Google] Text search error: {data.get('status')}")
             return []
 
         return data.get('results', [])
-    except requests.RequestException as e:
-        print(f"[Google] Request error: {e}")
+    except requests.RequestException:
+        print("[Google] Request error during text search.")
         return []
 
 
@@ -88,7 +89,10 @@ def _get_place_details(place_id):
 
     params = {
         'place_id': place_id,
-        'fields': 'name,formatted_phone_number,website,opening_hours,formatted_address',
+        'fields': (
+            'name,formatted_phone_number,website,opening_hours,formatted_address,'
+            'address_components'
+        ),
         'key': API_KEY,
     }
 
@@ -111,15 +115,33 @@ def _get_place_details(place_id):
         if oh.get('weekday_text'):
             hours_text = '; '.join(oh['weekday_text'])
 
+        components = result.get("address_components", [])
+
+        def _component(*wanted_types):
+            wanted = set(wanted_types)
+            for item in components:
+                item_types = set(item.get("types") or [])
+                if wanted & item_types:
+                    return item.get("long_name", "")
+            return ""
+
+        website = result.get('website', '') or ''
+        if website and GOOGLE_URL_RE.search(website):
+            website = ""
+
         return {
             'phone': result.get('formatted_phone_number', ''),
-            'website': result.get('website', ''),
+            'website': website,
             'opening_hours': hours_text or '',
             'address': result.get('formatted_address', ''),
             'google_name': result.get('name', ''),
+            'city': _component("locality", "postal_town", "administrative_area_level_3"),
+            'county': _component("administrative_area_level_2"),
+            'state': _component("administrative_area_level_1"),
+            'zip_code': _component("postal_code"),
         }
-    except requests.RequestException as e:
-        print(f"[Google] Details error: {e}")
+    except requests.RequestException:
+        print("[Google] Request error during details lookup.")
         return None
 
 
@@ -140,6 +162,9 @@ def enrich_with_google(cemetery_name, lat, lon):
 
     query = f"{cemetery_name} cemetery"
     candidates = _text_search(query, lat, lon)
+
+    best = None
+    best_score = -1
 
     for candidate in candidates:
         g_name = candidate.get('name', '')
@@ -169,8 +194,16 @@ def enrich_with_google(cemetery_name, lat, lon):
 
         details = _get_place_details(place_id)
         if details:
-            print(f"[Google] ✅ Matched '{cemetery_name}' → '{g_name}' (dist={dist:.2f}km, sim={similarity:.2f})")
-            return details
+            # Blend similarity and proximity into a simple score.
+            score = (similarity * 0.7) + (max(0, (MAX_DISTANCE_KM - dist) / MAX_DISTANCE_KM) * 0.3)
+            if score > best_score:
+                best_score = score
+                best = (details, g_name, dist, similarity)
+
+    if best:
+        details, g_name, dist, similarity = best
+        print(f"[Google] ✅ Matched '{cemetery_name}' → '{g_name}' (dist={dist:.2f}km, sim={similarity:.2f})")
+        return details
 
     print(f"[Google] ✗ No match for '{cemetery_name}' near ({lat:.4f}, {lon:.4f})")
     return None

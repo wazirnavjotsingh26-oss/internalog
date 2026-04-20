@@ -1,3 +1,4 @@
+import re
 import requests
 import time
 try:
@@ -50,6 +51,32 @@ def clean_display_address(address_text):
         return ", ".join(parts[:3])
     return ", ".join(parts[:2]) if len(parts) >= 2 else (parts[0] if parts else "")
 
+
+def _clean_county_name(county_text):
+    if not county_text:
+        return ""
+    value = str(county_text).strip()
+    return re.sub(r"\s+county$", "", value, flags=re.IGNORECASE).strip()
+
+
+def _derive_address_from_tags(tags):
+    house = str(tags.get("addr:housenumber", "")).strip()
+    street = str(tags.get("addr:street", "")).strip()
+    full = " ".join(part for part in (house, street) if part).strip()
+    if full:
+        return full
+    return str(tags.get("addr:full", "")).strip()
+
+
+def _normalize_cemetery_type(tags):
+    amenity = str(tags.get("amenity", "")).strip().lower()
+    landuse = str(tags.get("landuse", "")).strip().lower()
+    if amenity == "grave_yard":
+        return "graveyard"
+    if landuse == "cemetery":
+        return "cemetery"
+    return "cemetery"
+
 # 🔥 All US States List
 STATE_NAMES = [
     "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut",
@@ -99,29 +126,14 @@ def parse_element(element, state_name):
         print("[SKIP] No lat/lon:", element)
         return None
 
-    # Determine type
-    if tags.get("amenity") == "grave_yard":
-        cemetery_type = "graveyard"
-    elif tags.get("landuse") == "cemetery":
-        cemetery_type = "cemetery"
-    else:
-        cemetery_type = "unknown"
-    access = tags.get('access', '').lower()
-    ownership = tags.get('ownership', '').lower()
-
-    if access == 'public' or ownership == 'public':
-        cemetery_type = 'public'
-    elif access == 'private' or ownership == 'private':
-        cemetery_type = 'private'
-    elif 'memorial' in name.lower():
-        cemetery_type = 'memorial'
+    cemetery_type = _normalize_cemetery_type(tags)
 
     return {
         'name': name,
         'country': 'United States',
-        'address': tags.get('addr:street', ''),
+        'address': _derive_address_from_tags(tags),
         'city': tags.get('addr:city', ''),
-        'county': tags.get('addr:county', ''),
+        'county': _clean_county_name(tags.get('addr:county', '')),
         'state': state_name,
         'zip_code': tags.get('addr:postcode', ''),
 
@@ -221,7 +233,7 @@ def fetch_cemeteries_by_state(state_name, enrich_address=False):
                         cemetery['city'] = city_from_address_parts(cemetery.get('address', ''))
 
                     if geo_data.get('county'):
-                        cemetery['county'] = geo_data.get('county', '')
+                        cemetery['county'] = _clean_county_name(geo_data.get('county', ''))
                     if geo_data.get('zip_code'):
                         cemetery['zip_code'] = geo_data.get('zip_code', '')
 
@@ -230,13 +242,15 @@ def fetch_cemeteries_by_state(state_name, enrich_address=False):
                         cemetery['address'] = clean_display_address(full_address)
 
             if not cemetery.get('city'):
-                cemetery['city'] = cemetery.get('county') or "Unknown"
-            if not cemetery.get('phone'):
-                cemetery['phone'] = "Not Available"
-            if not cemetery.get('opening_hours'):
-                cemetery['opening_hours'] = "Not Available"
-            if not cemetery.get('website'):
-                cemetery['website'] = fallback_google_search_link(cemetery)
+                cemetery['city'] = city_from_address_parts(cemetery.get('address', ''))
+            cemetery['county'] = _clean_county_name(cemetery.get('county', ''))
+            cemetery['country'] = 'United States'
+            cemetery['state'] = state_name
+            cemetery['type'] = (
+                cemetery.get('type')
+                if cemetery.get('type') in {'cemetery', 'graveyard'}
+                else 'cemetery'
+            )
 
             cemeteries.append(cemetery)
 

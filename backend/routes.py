@@ -33,6 +33,7 @@ SETTINGS_DOC_ID = "admin_settings"
 COLLECT_JOBS_COLLECTION = "collect_jobs"
 API_LOG_LIMIT = 250
 DEFAULT_COUNTRY = "United States"
+ALLOWED_TYPES = {"cemetery", "graveyard"}
 
 
 def serialize_doc(doc):
@@ -85,14 +86,23 @@ def register_routes(app):
     def apply_record_fallbacks(doc):
         clean = dict(doc or {})
 
+        clean["country"] = DEFAULT_COUNTRY
+        clean["type"] = (
+            clean.get("type")
+            if str(clean.get("type", "")).strip().lower() in ALLOWED_TYPES
+            else "cemetery"
+        )
         if not clean.get("city"):
-            clean["city"] = clean.get("county") or "Unknown"
-        if not clean.get("phone"):
-            clean["phone"] = "Not Available"
-        if not clean.get("opening_hours"):
-            clean["opening_hours"] = "Not Available"
-        if not clean.get("website"):
-            clean["website"] = build_website_fallback(clean)
+            clean["city"] = clean.get("county") or clean.get("state") or DEFAULT_COUNTRY
+        if not clean.get("county"):
+            clean["county"] = clean.get("city") or clean.get("state") or DEFAULT_COUNTRY
+        if not clean.get("address"):
+            clean["address"] = ", ".join(
+                part for part in [clean.get("city", ""), clean.get("state", ""), clean.get("country", "")]
+                if part
+            )
+        if not clean.get("zip_code"):
+            clean["zip_code"] = "00000"
 
         return clean
 
@@ -746,6 +756,10 @@ def register_routes(app):
                         )
                         if google_data.get("address"):
                             cemetery["address"] = google_data["address"]
+                        cemetery["city"] = google_data.get("city") or cemetery.get("city")
+                        cemetery["county"] = google_data.get("county") or cemetery.get("county")
+                        cemetery["state"] = google_data.get("state") or cemetery.get("state")
+                        cemetery["zip_code"] = google_data.get("zip_code") or cemetery.get("zip_code")
                         cemetery["data_source"] = "Google+OSM"
 
                 if auto_clean:
