@@ -83,3 +83,9 @@ logs/
 *.bak
 *.tmp
 *.swp
+
+.venv/
+__pycache__/
+.env
+node_modules/
+dist/
